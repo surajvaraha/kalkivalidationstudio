@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Database
+biochar.db
+
+# Excel/Uploads
+validated_*.xlsx
+*.xlsx
+uploads/
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+.gemini/

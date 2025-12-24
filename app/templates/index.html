@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biochar Validation Studio</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Inter:wght@400;500&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="top-bar">
+            <div class="logo">
+                <h1>Biochar Validation Studio</h1>
+            </div>
+            <div class="batch-nav-header">
+                <button id="prevBatch" class="nav-btn">← Prev Batch</button>
+                <span id="batchIndicator">Batch 0 / 0</span>
+                <button id="nextBatch" class="nav-btn">Next Batch →</button>
+            </div>
+            <div class="actions">
+                <input type="file" id="fileUpload" hidden>
+                <button id="uploadBtn" class="btn primary">Upload</button>
+                <button id="downloadBtn" class="btn secondary" disabled>Download</button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="workspace" id="mainWorkspace" style="display: none;">
+
+            <!-- Left Panel: Batch Summary (25%) -->
+            <section class="summary-panel">
+                <div class="panel-header">
+                    <h2>Batch Summary</h2>
+                </div>
+                <div class="summary-content">
+                    <div class="batch-meta-list" id="batchMetaList">
+                        <!-- ID, Date etc -->
+                    </div>
+                    <hr>
+                    <h3>Validation Status</h3>
+                    <table id="statusTable">
+                        <thead>
+                            <tr>
+                                <th>Stage</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Rows: Moisture, Start, Middle... -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Right Panel: Single Image Validation (75%) -->
+            <section class="validation-panel">
+                <div class="image-viewer">
+                    <img id="mainImage" src="" alt="Select a stage">
+                    <div class="image-overlay-info" id="imageOverlay">
+                        <!-- Optional ID or Info overlay -->
+                    </div>
+                </div>
+
+                <!-- VALIDATION CONTROLS (Footer/Bottom Section) -->
+                <div class="validation-controls">
+                    <div class="control-header">
+                        <h3 id="currentStageTitle">Stage Name</h3>
+                        <div class="stage-nav">
+                            <button id="prevStage" class="btn secondary">← Previous Image</button>
+                            <button id="nextStage" class="btn primary">Next Image →</button>
+                        </div>
+                    </div>
+
+                    <div class="control-form">
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="statusSelect"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Reason (if Rejected/Query)</label>
+                            <select id="reasonSelect"></select>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Comments</label>
+                            <input type="text" id="commentsInput" placeholder="Add comments...">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState">
+            <h2>Start by uploading a Biochar Validation Sheet</h2>
+            <button class="btn primary" onclick="document.getElementById('fileUpload').click()">Upload File</button>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>

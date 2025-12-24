@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalki Validation Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'IBM Plex Sans', sans-serif;
+            background-color: #f4f4f4;
+            letter-spacing: 0.16px;
+            color: #161616;
+        }
+
+        .carbon-btn {
+            transition: all 70ms cubic-bezier(0.2, 0, 0.38, 0.9);
+            position: relative;
+        }
+
+        .carbon-btn:active {
+            transform: scale(0.98);
+        }
+
+        .carbon-table-header {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.32px;
+        }
+
+        .cds-header {
+            background: #161616;
+            color: #fff;
+            height: 3rem;
+            display: flex;
+            align-items: center;
+            padding: 0 1rem;
+        }
+
+        .cds-brand {
+            font-weight: 600;
+            font-size: 0.875rem;
+            letter-spacing: 0.1px;
+        }
+
+        .cds-title {
+            font-weight: 400;
+            font-size: 0.875rem;
+            color: #c6c6c6;
+            margin-left: 0.5rem;
+        }
+    </style>
+</head>
+
+<body class="bg-[#f4f4f4] text-[#161616] flex flex-col min-h-screen">
+
+    <!-- Header -->
+    <header class="cds-header w-full border-b border-[#393939] sticky top-0 z-50">
+        <span class="cds-brand">Varaha</span>
+        <span class="cds-title">| Kalki Validation Studio</span>
+    </header>
+
+    <div class="flex-1 max-w-[80rem] mx-auto w-full p-8 md:p-12">
+
+        <!-- Header Section -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
+            <div>
+                <h1 class="text-[2.625rem] leading-[1.19] font-light text-[#161616] mb-2">My Tasks</h1>
+                <p class="text-sm text-[#525252] max-w-xl">Manage and validate biochar production batches from Looker
+                    and Kalki streams.</p>
+            </div>
+
+            <button onclick="document.getElementById('uploadModal').classList.remove('hidden')"
+                class="carbon-btn bg-[#198038] hover:bg-[#0e6027] text-white text-sm font-medium h-[3rem] px-4 pr-12 relative flex items-center justify-between min-w-[200px]">
+                <span>New Validation Task</span>
+                <span class="absolute right-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="square" stroke-linejoin="miter" d="M12 4v16m8-8H4" />
+                    </svg>
+                </span>
+            </button>
+        </div>
+
+        <!-- Data Table -->
+        <div class="bg-white min-h-[400px] border-t-4 border-[#198038]">
+            <div class="py-4 px-4 border-b border-[#e0e0e0] bg-white flex justify-between items-center h-[3rem]">
+                <h2 class="text-xl font-semibold text-[#161616]">Active Validations</h2>
+            </div>
+
+            {% if tasks %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-[#e0e0e0]">
+                        <tr class="carbon-table-header text-[#161616]">
+                            <th class="px-4 py-3">Filename</th>
+                            <th class="px-4 py-3">Source Type</th>
+                            <th class="px-4 py-3">Uploaded</th>
+                            <th class="px-4 py-3">Status</th>
+                            <th class="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[#e0e0e0]">
+                        {% for task in tasks %}
+                        <tr class="hover:bg-[#e5e5e5] transition-colors group h-[3rem] bg-white text-sm">
+                            <td class="px-4 font-medium text-[#161616]">{{ task.filename }}</td>
+                            <td class="px-4">
+                                <span
+                                    class="px-2 py-0.5 text-xs font-mono border border-[#8d8d8d] bg-white text-[#525252]">
+                                    {{ task.task_type.value }}
+                                </span>
+                            </td>
+                            <td class="px-4 text-[#525252] font-mono text-xs">{{ task.created_at.strftime('%Y-%m-%d
+                                %H:%M') }}</td>
+                            <td class="px-4">
+                                {% if task.status.value == 'COMPLETED' %}
+                                <span class="flex items-center gap-2 text-xs text-[#198038] font-medium">
+                                    <svg class="w-3 h-3 fill-current" viewBox="0 0 16 16">
+                                        <path
+                                            d="M8 15A7 7 0 1 1 15 8a7.008 7.008 0 0 1-7 7zm0-13a6 6 0 1 0 6 6 6 6 0 0 0-6-6z">
+                                        </path>
+                                        <path d="m6.5 9.8-1.8-1.8L4 8.7l2.5 2.5L12 5.7l-.7-.7z"></path>
+                                    </svg>
+                                    Done
+                                </span>
+                                {% else %}
+                                <span class="flex items-center gap-2 text-xs text-[#525252] font-medium">
+                                    <svg class="w-3 h-3 fill-current animate-spin" viewBox="0 0 16 16">
+                                        <path d="M8 1a7 7 0 1 0 7 7 7 7 0 0 0-7-7zm0 13a6 6 0 1 1 6-6 6 6 0 0 1-6 6z"
+                                            opacity=".2"></path>
+                                        <path d="M8 1a7 7 0 0 0 0 14V8a7 7 0 0 0 0-14z"></path>
+                                    </svg>
+                                    In Progress
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 text-right">
+                                <div class="flex justify-end items-center h-full gap-0">
+                                    <button onclick="downloadTask('{{ task.id }}')"
+                                        class="h-[3rem] w-[3rem] flex items-center justify-center hover:bg-[#e0e0e0] text-[#525252] transition border-l border-transparent">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2"
+                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                    </button>
+                                    <a href="/validate/{{ task.id }}"
+                                        class="h-[3rem] px-4 flex items-center gap-2 hover:bg-[#198038] hover:text-white text-[#198038] font-medium transition text-xs border-l border-[#e0e0e0] uppercase tracking-wide">
+                                        Review
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2"
+                                                d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                        </svg>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div
+                class="bg-[#f4f4f4] p-[3rem] flex flex-col items-center justify-center min-h-[300px] border-t border-[#e0e0e0]">
+                <h4 class="text-xl font-light text-[#161616] mb-2">No active tasks</h4>
+                <p class="text-[#525252] mb-6 text-sm">Upload a new dataset to begin validation.</p>
+                <button onclick="document.getElementById('uploadModal').classList.remove('hidden')"
+                    class="text-[#0f62fe] hover:underline text-sm font-medium">Create new task</button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-[#161616] text-[#c6c6c6] py-12 px-8 md:px-12 mt-auto">
+        <div class="max-w-[80rem] mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div class="flex flex-col">
+                <span class="text-sm font-semibold text-white mb-1">Kalki Validation Studio</span>
+                <span class="text-xs text-[#8d8d8d]">Internal Tool v5.0 | Varaha Earth</span>
+            </div>
+
+            <div class="text-xs text-[#8d8d8d] text-right">
+                <p>Designed and developed by <span class="text-white">Suraj Singh</span></p>
+                <p class="mt-0.5">Powered by AI Google Gemini / Antigravity</p>
+            </div>
+        </div>
+    </footer>
+
+
+    <!-- Upload Modal (Carbon Modal Style) -->
+    <div id="uploadModal"
+        class="hidden fixed inset-0 bg-[#161616] bg-opacity-60 flex items-start pt-[10vh] justify-center z-50 p-4 transition-opacity">
+        <div class="bg-white max-w-lg w-full shadow-xl relative border-t-4 border-[#198038]">
+
+            <div class="p-4 pr-12">
+                <h3 class="text-xl font-semibold text-[#161616] mb-1">Import Dataset</h3>
+                <p class="text-sm text-[#525252]">Select a Looker or Kalki .xlsx file.</p>
+                <button onclick="document.getElementById('uploadModal').classList.add('hidden')"
+                    class="absolute top-4 right-4 text-[#161616] hover:bg-[#e0e0e0] p-2">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="square" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="p-4 bg-[#f4f4f4]">
+                <div class="border border-dashed border-[#8d8d8d] p-8 text-center hover:border-[#198038] hover:bg-white transition cursor-pointer group"
+                    onclick="document.getElementById('fileInput').click()">
+                    <span class="text-[#198038] group-hover:underline font-medium text-sm">Choose a file</span>
+                    <span class="text-[#525252] text-sm"> or drag it here</span>
+                    <input type="file" id="fileInput" class="hidden" onchange="uploadFile()" />
+                </div>
+            </div>
+
+            <div class="flex">
+                <button onclick="document.getElementById('uploadModal').classList.add('hidden')"
+                    class="w-1/2 h-[3rem] bg-[#393939] text-white hover:bg-[#4c4c4c] font-medium text-sm transition text-left px-4">Cancel</button>
+                <button onclick="uploadFile()"
+                    class="w-1/2 h-[3rem] bg-[#198038] text-white hover:bg-[#0e6027] font-medium text-sm transition text-left px-4 flex justify-between items-center group">
+                    Upload
+                    <svg class="h-4 w-4 transform group-hover:translate-x-1 transition" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-width="2" stroke-linecap="square" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function uploadFile() {
+            const input = document.getElementById('fileInput');
+            if (input.files.length === 0) return;
+
+            const formData = new FormData();
+            formData.append("file", input.files[0]);
+
+            try {
+                const res = await fetch('/api/tasks', { method: 'POST', body: formData });
+                if (res.ok) {
+                    window.location.reload();
+                } else {
+                    const err = await res.json();
+                    alert("Error: " + err.detail);
+                }
+            } catch (e) {
+                alert("Upload failed");
+            }
+        }
+
+        async function downloadTask(taskId) {
+            window.location.href = `/api/tasks/${taskId}/download`;
+        }
+    </script>
+</body>
+
+</html>

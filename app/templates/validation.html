@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validator - {{ task.filename }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/static/validation_rules.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'IBM Plex Sans', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            background: #f4f4f4;
+            color: #161616;
+        }
+
+        /* Carbon Components */
+        .cds-header {
+            background: #161616;
+            height: 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1rem;
+            color: #f4f4f4;
+            z-index: 50;
+        }
+
+        .cds-label {
+            font-size: 0.75rem;
+            color: #525252;
+            font-weight: 400;
+            margin-bottom: 0.25rem;
+            display: block;
+        }
+
+        .cds-select {
+            appearance: none;
+            background: #f4f4f4;
+            border: none;
+            border-bottom: 1px solid #8d8d8d;
+            padding: 0 2rem 0 0.5rem;
+            height: 2.5rem;
+            width: 100%;
+            font-family: inherit;
+            font-size: 0.875rem;
+            color: #161616;
+            cursor: pointer;
+            transition: background 70ms;
+        }
+
+        .cds-select:focus {
+            outline: 2px solid #198038;
+            outline-offset: -2px;
+        }
+
+        .cds-select:hover {
+            background: #e5e5e5;
+        }
+
+        .cds-input {
+            background: #f4f4f4;
+            border: none;
+            border-bottom: 1px solid #8d8d8d;
+            padding: 0.5rem;
+            width: 100%;
+            font-family: inherit;
+            font-size: 0.875rem;
+            transition: background 70ms;
+            resize: none;
+        }
+
+        .cds-input:focus {
+            outline: 2px solid #198038;
+            outline-offset: -2px;
+        }
+
+        .cds-key-hint {
+            font-size: 10px;
+            background: #393939;
+            color: #f4f4f4;
+            padding: 1px 4px;
+            border-radius: 2px;
+            font-family: monospace;
+            margin-left: 4px;
+        }
+
+        .cds-checkbox {
+            width: 1rem;
+            height: 1rem;
+            border: 1px solid #161616;
+            appearance: none;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .cds-checkbox:checked {
+            background: #161616;
+            border-color: #161616;
+        }
+
+        .cds-checkbox:checked::after {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 1px;
+            width: 5px;
+            height: 8px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
+        /* Layout Grid System */
+        .layout-container {
+            display: flex;
+            height: calc(100vh - 3rem);
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .panel-left {
+            width: 260px;
+            min-width: 180px;
+            max-width: 400px;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .panel-center {
+            flex: 1;
+            min-width: 300px;
+            background: #262626;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-right {
+            width: 320px;
+            min-width: 200px;
+            max-width: 500px;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .resizer {
+            width: 4px;
+            cursor: col-resize;
+            background: #393939;
+            transition: background 0.2s;
+            z-index: 20;
+        }
+
+        .resizer:hover,
+        .resizer.active {
+            background: #198038;
+        }
+
+        .save-indicator {
+            font-size: 0.75rem;
+            color: #198038;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .save-indicator.visible {
+            opacity: 1;
+        }
+
+        /* Status Badges & Table */
+        .status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            border-radius: 2px;
+        }
+
+        .status-approved {
+            background: #defbe6;
+            color: #198038;
+        }
+
+        .status-rejected {
+            background: #ffe6e6;
+            color: #da1e28;
+        }
+
+        .status-pending {
+            background: #f4f4f4;
+            color: #525252;
+        }
+
+        .status-table {
+            width: 100%;
+            font-size: 11px;
+            text-align: left;
+        }
+
+        .status-table th {
+            padding: 4px 8px;
+            color: #525252;
+            font-weight: 600;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .status-table td {
+            padding: 4px 8px;
+            border-bottom: 1px solid #f4f4f4;
+            color: #161616;
+        }
+
+        .wrap-text {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #c6c6c6;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+    </style>
+</head>
+
+<body class="flex flex-col">
+
+    <!-- Header -->
+    <header class="cds-header w-full border-b border-[#393939] shrink-0">
+        <div class="flex items-center gap-4">
+            <a href="/" class="text-white hover:bg-[#393939] p-2 transition" title="Back to Dashboard">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="square" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+            </a>
+            <div class="flex flex-col">
+                <span class="font-semibold text-sm tracking-wide leading-tight">Kalki Validation Studio</span>
+                <span class="text-[#8d8d8d] text-[10px] leading-tight font-mono">{{ task.filename }}</span>
+            </div>
+        </div>
+
+        <!-- Row Jumper -->
+        <div class="flex items-center gap-3">
+            <div class="flex items-center bg-[#262626] rounded px-2 py-0.5 border border-[#393939]">
+                <span class="text-xs text-[#c6c6c6] mr-2">Row</span>
+                <input type="number" id="jumpInput"
+                    class="w-10 bg-transparent text-white text-xs text-center focus:outline-none border-b border-[#525252] focus:border-[#198038] font-mono"
+                    placeholder="#">
+                <span class="text-xs text-[#525252] ml-1">/ <span id="totalBatches">--</span></span>
+            </div>
+            <div class="w-24 h-1 bg-[#393939]">
+                <div id="progressBar" class="h-full bg-[#198038] transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Right Actions -->
+        <div class="flex items-center gap-4">
+            <div id="saveStatus" class="save-indicator">
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8 15A7 7 0 1 1 15 8a7.008 7.008 0 0 1-7 7zm0-13a6 6 0 1 0 6 6 6 6 0 0 0-6-6z"></path>
+                    <path d="m6.5 9.8-1.8-1.8L4 8.7l2.5 2.5L12 5.7l-.7-.7z"></path>
+                </svg>
+                Saved
+            </div>
+            <button onclick="downloadTask()"
+                class="text-xs font-medium text-[#f4f4f4] bg-[#198038] hover:bg-[#0e6027] px-3 py-1.5 transition">
+                Export .xlsx
+            </button>
+        </div>
+    </header>
+
+    <div class="layout-container" id="mainContainer">
+
+        <!-- LEFT PANEL: Info & Status Table -->
+        <div class="panel-left" id="panelLeft">
+            <!-- Header -->
+            <div class="p-3 border-b border-[#e0e0e0] bg-[#f4f4f4] shrink-0">
+                <h3 class="text-[10px] font-semibold text-[#525252] uppercase tracking-wider">Batch Info</h3>
+            </div>
+
+            <!-- V9.1: Status Table (Fixed at Top) -->
+            <div class="border-b border-[#e0e0e0] bg-white shrink-0">
+                <table class="status-table w-full">
+                    <thead>
+                        <tr>
+                            <th class="py-2 px-3 text-left text-[9px] text-[#8d8d8d] uppercase tracking-wider">Stage
+                            </th>
+                            <th class="py-2 px-3 text-left text-[9px] text-[#8d8d8d] uppercase tracking-wider">Status
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="leftPanelStatusTable">
+                        <!-- JS Populates -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Scrollable Details -->
+            <div class="p-4 space-y-4 overflow-y-auto flex-1 bg-[#fbfbfb]" id="batchDetails">
+                <!-- JS Populated -->
+            </div>
+        </div>
+
+        <div class="resizer" id="resizerLeft"></div>
+
+        <!-- CENTER PANEL: Image -->
+        <div class="panel-center" id="panelCenter">
+
+            <!-- V8: Smart Rejection Modal -->
+            <div id="rejectionModal"
+                class="hidden absolute inset-0 z-50 bg-black/80 flex items-center justify-center backdrop-blur-sm">
+                <div class="bg-white p-6 max-w-lg w-full shadow-2xl rounded border-t-4 border-[#da1e28]">
+                    <h3 class="text-lg font-bold text-[#161616] mb-4">Select Rejection Reason</h3>
+                    <div id="rejectionOptions" class="grid grid-cols-1 gap-2">
+                        <!-- JS populated buttons -->
+                    </div>
+                    <div class="mt-4 text-xs text-[#525252] text-center">Press Number Key (1-9) to Select</div>
+                    <button onclick="closeRejectionModal()"
+                        class="absolute top-4 right-4 text-[#525252] hover:text-[#161616] p-2">✕</button>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="bg-[#161616] border-b border-[#393939] p-2 flex justify-center z-10 shrink-0">
+                <div class="flex bg-[#393939] gap-[1px]">
+                    <button onclick="changeStage('moisture')" id="tab_moisture"
+                        class="px-4 py-1.5 text-xs text-[#c6c6c6] hover:text-white hover:bg-[#525252] transition">Moist</button>
+                    <button onclick="changeStage('start')" id="tab_start"
+                        class="px-4 py-1.5 text-xs text-[#c6c6c6] hover:text-white hover:bg-[#525252] transition">Start</button>
+                    <button onclick="changeStage('mid')" id="tab_mid"
+                        class="px-4 py-1.5 text-xs text-[#c6c6c6] hover:text-white hover:bg-[#525252] transition">Mid</button>
+                    <button onclick="changeStage('90')" id="tab_90"
+                        class="px-4 py-1.5 text-xs text-[#c6c6c6] hover:text-white hover:bg-[#525252] transition">90%</button>
+                    <button onclick="changeStage('end')" id="tab_end"
+                        class="px-4 py-1.5 text-xs text-[#c6c6c6] hover:text-white hover:bg-[#525252] transition">End</button>
+                </div>
+            </div>
+
+            <!-- Canvas -->
+            <div class="flex-1 relative overflow-hidden flex items-center justify-center cursor-move bg-[#262626]"
+                id="imageContainer" onmousedown="startPan(event)">
+
+                <img id="mainImage" src="" alt="Validation"
+                    class="max-w-none transition-transform duration-75 ease-out select-none pointer-events-none origin-center"
+                    style="transform: translate(0px, 0px) scale(1) rotate(0deg);">
+
+                <div id="noImageMessage" class="hidden flex flex-col items-center justify-center text-[#525252]">
+                    <span class="text-xs font-mono uppercase tracking-widest opacity-50">No Image</span>
+                </div>
+
+                <!-- Cycle Arrows -->
+                <button onclick="prevStage()"
+                    class="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-12 bg-[#161616]/50 text-white/50 hover:bg-[#161616] hover:text-white flex items-center justify-center transition">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="square" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+                <button onclick="nextStage()"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-12 bg-[#161616]/50 text-white/50 hover:bg-[#161616] hover:text-white flex items-center justify-center transition">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="square" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Bottom: Controls -->
+            <div
+                class="h-12 bg-[#161616] border-t border-[#393939] flex items-center justify-between px-2 shrink-0 z-20">
+                <button onclick="prevBatch()"
+                    class="flex items-center gap-2 text-xs text-[#c6c6c6] hover:text-white px-3 h-full hover:bg-[#393939] transition"
+                    title="Prev Batch (Shift + Left)">
+                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="square" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Batch
+                </button>
+
+                <!-- Image Tools -->
+                <div class="flex items-center gap-2">
+                    <div class="flex items-center border border-[#393939] rounded overflow-hidden">
+                        <button onclick="fitToScreen()"
+                            class="w-8 h-8 flex items-center justify-center text-[#c6c6c6] hover:text-white hover:bg-[#393939]"
+                            title="Fit to Screen">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="square" stroke-width="2"
+                                    d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                            </svg>
+                        </button>
+                        <button onclick="resetZoom()"
+                            class="w-8 h-8 flex items-center justify-center text-[#c6c6c6] hover:text-white hover:bg-[#393939] border-l border-[#393939]"
+                            title="Reset to 100%">
+                            <span class="text-[10px] font-bold">1:1</span>
+                        </button>
+                        <button onclick="rotateImage()"
+                            class="w-8 h-8 flex items-center justify-center text-[#c6c6c6] hover:text-white hover:bg-[#393939] border-l border-[#393939]"
+                            title="Rotate 90°">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="square" stroke-width="2"
+                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <button onclick="nextBatch()"
+                    class="flex items-center gap-2 text-xs font-medium text-[#198038] hover:text-white hover:bg-[#198038] px-3 h-full transition"
+                    title="Next Batch (Shift + Right)">
+                    Batch
+                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="square" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="resizer" id="resizerRight"></div>
+
+        <!-- RIGHT PANEL: Validation -->
+        <div class="panel-right" id="panelRight">
+            <div class="p-3 border-b border-[#e0e0e0] bg-[#f4f4f4] flex justify-between items-center">
+                <div class="flex flex-col">
+                    <h3 class="text-[10px] font-semibold text-[#525252] uppercase tracking-wider">Validation Decision
+                    </h3>
+                    <span class="text-[11px] font-mono text-[#198038] font-bold"><span id="validatedCount">0</span> /
+                        <span id="totalBatchesHeader">0</span> Done</span>
+                </div>
+                <span class="text-[9px] text-[#8d8d8d]">Auto-save ON</span>
+            </div>
+
+            <div class="p-5 space-y-6 flex-1 overflow-y-auto">
+                <!-- Status -->
+                <div class="space-y-1">
+                    <label class="cds-label">Status <span class="cds-key-hint">A / R / Q</span></label>
+                    <div class="relative">
+                        <select id="statusSelect" onchange="autoSave()"
+                            class="cds-select border-b border-[#8d8d8d] focus:border-[#198038]">
+                            <option value="">Select...</option>
+                            <option value="Approved" class="text-[#198038] font-medium">Approved</option>
+                            <option value="Rejected" class="text-[#da1e28] font-medium">Rejected</option>
+                            <option value="Link error">Link Error</option>
+                            <option value="Under Query">Under Query</option>
+                        </select>
+                        <svg class="w-3 h-3 absolute right-3 top-3 pointer-events-none fill-[#161616]"
+                            viewBox="0 0 16 16">
+                            <path d="M8 11L3 6 3.7 5.3 8 9.6 12.3 5.3 13 6z" />
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Reason -->
+                <div id="rejectionSection" class="hidden space-y-1 animate-fade-in">
+                    <label class="cds-label text-[#da1e28]">Reason</label>
+                    <div class="relative">
+                        <select id="reasonSelect" onchange="autoSave()"
+                            class="cds-select border-b border-[#da1e28] bg-[#fff0f0] text-[#da1e28]">
+                            <option value="">Select Reason...</option>
+                            <!-- JS Populates -->
+                        </select>
+                        <svg class="w-3 h-3 absolute right-3 top-3 pointer-events-none fill-[#da1e28]"
+                            viewBox="0 0 16 16">
+                            <path d="M8 11L3 6 3.7 5.3 8 9.6 12.3 5.3 13 6z" />
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Checks -->
+                <div class="space-y-3 pt-4 border-t border-[#e0e0e0]">
+                    <legend class="cds-label">Checks</legend>
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="checkGeotag" class="cds-checkbox" onchange="autoSave()">
+                        <label for="checkGeotag" class="text-xs text-[#161616] cursor-pointer">Geotag Present <span
+                                class="cds-key-hint">G</span></label>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="checkSerial" class="cds-checkbox" onchange="autoSave()">
+                        <label for="checkSerial" class="text-xs text-[#161616] cursor-pointer">Serial # Valid <span
+                                class="cds-key-hint">S</span></label>
+                    </div>
+                </div>
+
+                <!-- Comments -->
+                <div class="space-y-1 pt-4">
+                    <label class="cds-label">Comments</label>
+                    <textarea id="commentBox" oninput="debouncedAutoSave()" rows="4"
+                        class="cds-input bg-[#f4f4f4] focus:bg-white" placeholder="Add notes..."></textarea>
+                </div>
+            </div>
+
+            <!-- Shortcuts Help (Larger) -->
+            <div
+                class="p-4 border-t border-[#e0e0e0] bg-[#f8f8f8] text-xs text-[#525252] grid grid-cols-2 gap-2 font-medium">
+                <span>Shift + &larr;/&rarr; : Batch</span>
+                <span>&larr;/&rarr; : Stage</span>
+                <span>A : Approve</span>
+                <span>R : Smart Reject</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logic -->
+    <script>
+        const TASK_ID = "{{ task.id }}";
+        const TASK_TYPE = "{{ task.task_type.value }}";
+
+        let batches = [];
+        let currentIndex = 0;
+        let currentStage = 'moisture';
+        const STAGES = ['moisture', 'start', 'mid', '90', 'end'];
+
+        let zoom = 1, panX = 0, panY = 0, rotation = 0;
+        let isPanning = false, startX = 0, startY = 0;
+        let saveTimeout;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            initResizers();
+            await loadBatches();
+            renderBatch();
+            updateProgress();
+
+            document.getElementById('jumpInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    let val = parseInt(e.target.value);
+                    if (!isNaN(val) && val >= 1 && val <= batches.length) {
+                        currentIndex = val - 1;
+                        changeStage('moisture'); // Jump always resets to moisture
+                    } else alert("Invalid Row #");
+                    e.target.blur();
+                }
+            });
+
+            // GLOBAL KEYBOARD
+            document.addEventListener('keydown', (e) => {
+                const target = e.target;
+                if (target.matches('input, textarea, select')) return;
+
+                // If Modal is Open, handle numbers
+                const modal = document.getElementById('rejectionModal');
+                if (!modal.classList.contains('hidden')) {
+                    if (e.key >= '1' && e.key <= '9') {
+                        selectRejectionOption(parseInt(e.key) - 1);
+                    }
+                    if (e.key === 'Escape') closeRejectionModal();
+                    return;
+                }
+
+                const key = e.key.toLowerCase();
+
+                // Nav
+                if (e.shiftKey) {
+                    if (e.key === 'ArrowRight') nextBatch();
+                    if (e.key === 'ArrowLeft') prevBatch();
+                    return;
+                } else {
+                    if (e.key === 'ArrowRight') nextStage();
+                    if (e.key === 'ArrowLeft') prevStage();
+                }
+
+                // Actions
+                if (key === 'a') setStatus('Approved');
+                if (key === 'r') openRejectionModal(); // New Smart Flow
+                if (key === 'q') setStatus('Under Query');
+                if (key === 'g') toggleCheck('checkGeotag');
+                if (key === 's') toggleCheck('checkSerial');
+            });
+        });
+
+        // --- Smart Rejection ---
+        function openRejectionModal() {
+            // Get reasons from validaton_rules.js (via window object populated by JS)
+            // We need to fetch reasons dynamically based on TaskType and Stage
+            // Note: validation_rules.js populates the Select box, we can read from there!
+            const select = document.getElementById('reasonSelect');
+            const options = Array.from(select.options).filter(o => o.value !== "");
+
+            const container = document.getElementById('rejectionOptions');
+            container.innerHTML = '';
+
+            options.slice(0, 9).forEach((opt, idx) => {
+                const num = idx + 1;
+                const btn = document.createElement('button');
+                btn.className = "flex items-center w-full text-left p-2 hover:bg-[#ffe6e6] transition border border-transparent hover:border-[#da1e28] rounded group";
+                btn.innerHTML = `<span class="bg-[#da1e28] text-white font-mono text-xs w-6 h-6 flex items-center justify-center rounded mr-3 shrink-0 group-hover:scale-110 transition">${num}</span> <span class="text-sm font-medium text-[#161616]">${opt.text}</span>`;
+                btn.onclick = () => selectRejectionOption(idx);
+                container.appendChild(btn);
+            });
+
+            document.getElementById('rejectionModal').classList.remove('hidden');
+        }
+
+        function closeRejectionModal() {
+            document.getElementById('rejectionModal').classList.add('hidden');
+        }
+
+        function selectRejectionOption(idx) {
+            const select = document.getElementById('reasonSelect');
+            const validOptions = Array.from(select.options).filter(o => o.value !== "");
+            if (idx < validOptions.length) {
+                // First set status to Rejected
+                document.getElementById('statusSelect').value = 'Rejected';
+                // Then set reason
+                select.value = validOptions[idx].value;
+                // Trigger Save
+                autoSave();
+                closeRejectionModal();
+                // Refresh UI to show rejection fields
+                updateRejectionVisibility();
+            }
+        }
+
+        function setStatus(val) {
+            const el = document.getElementById('statusSelect');
+            el.value = val;
+            el.dispatchEvent(new Event('change'));
+        }
+        function toggleCheck(id) {
+            const el = document.getElementById(id);
+            el.checked = !el.checked;
+            el.dispatchEvent(new Event('change'));
+        }
+
+
+        // --- Data & Nav ---
+        async function loadBatches() {
+            try {
+                const res = await fetch(`/api/tasks/${TASK_ID}/batches?limit=10000`);
+                const json = await res.json();
+                batches = json.data;
+                document.getElementById('totalBatches').innerText = batches.length;
+                document.getElementById('totalBatchesHeader').innerText = batches.length;
+            } catch (e) { console.error(e); }
+        }
+
+        function updateProgress() {
+            if (!batches.length) return;
+            let count = 0;
+            batches.forEach(b => {
+                if (b.validation_data && Object.keys(b.validation_data).length > 0) {
+                    let hasStatus = Object.values(b.validation_data).some(v => v.status);
+                    if (hasStatus) count++;
+                }
+            });
+            document.getElementById('validatedCount').innerText = count;
+        }
+
+        function renderBatch() {
+            if (!batches.length) return;
+            const batch = batches[currentIndex];
+            document.getElementById('jumpInput').value = batch.row_index + 1;
+            document.getElementById('progressBar').style.width = `${((currentIndex + 1) / batches.length) * 100}%`;
+
+            renderBatchInfo(batch);
+            loadStageData(batch);
+        }
+
+        // --- View Logic ---
+        function loadStageData(batch) {
+            // ... (Same Image Logic as V7) ...
+            const STAGE_CONFIG = {
+                'moisture': { col: 'Wood Moisture Image', alt_col: 'Wood Moisture (Image)' },
+                'start': { col: 'Process Start (Image)' },
+                'mid': { col: 'Process Middle (Image)' },
+                '90': { col: '90% Done (Image)', alt_col: ' 90%End(Image)' },
+                'end': { col: 'Process End (Image)' }
+            };
+            const cfg = STAGE_CONFIG[currentStage];
+            let url = null;
+            if (batch.raw_data[cfg.col]) url = batch.raw_data[cfg.col];
+            else if (cfg.alt_col && batch.raw_data[cfg.alt_col]) url = batch.raw_data[cfg.alt_col];
+
+            const img = document.getElementById('mainImage');
+            const msg = document.getElementById('noImageMessage');
+
+            // Image Loading logic
+            if (url && url.length > 5) {
+                img.src = url;
+                img.onload = () => { fitToScreen(); };
+                img.classList.remove('hidden'); msg.classList.add('hidden');
+            } else {
+                img.classList.add('hidden'); msg.classList.remove('hidden');
+            }
+
+            const valData = batch.validation_data || {};
+            const stageData = valData[currentStage] || {};
+
+            document.getElementById('statusSelect').value = stageData.status || "";
+            document.getElementById('reasonSelect').value = stageData.reason || "";
+            document.getElementById('commentBox').value = stageData.comment || "";
+            const sub = stageData.sub_checks || {};
+            document.getElementById('checkGeotag').checked = sub.geotag || false;
+            document.getElementById('checkSerial').checked = sub.serial || false;
+
+            updateLeftPanelTable(valData);
+            updateRejectionVisibility();
+            updateTabData();
+        }
+
+        function updateLeftPanelTable(valData) {
+            const tbody = document.getElementById('leftPanelStatusTable');
+            tbody.innerHTML = '';
+            STAGES.forEach(s => {
+                const tr = document.createElement('tr');
+                const data = valData[s];
+                const status = data ? data.status : null;
+
+                let badgeClass = 'status-pending';
+                let badgeText = 'Pending';
+
+                if (status === 'Approved') { badgeClass = 'status-approved'; badgeText = 'Approved'; }
+                else if (status === 'Rejected') { badgeClass = 'status-rejected'; badgeText = 'Rejected'; }
+                else if (status) { badgeClass = 'bg-blue-100 text-blue-800 status-badge'; badgeText = status; }
+
+                // Highlight current row
+                if (s === currentStage) tr.className = "bg-[#f0f0f0] font-bold";
+
+                tr.innerHTML = `
+                    <td class="capitalize text-[10px]">${s}</td>
+                    <td><span class="${badgeClass} status-badge">${badgeText}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- V8 Logic ---
+        function changeStage(stage) { currentStage = stage; renderBatch(); }
+
+        function nextStage() {
+            let idx = STAGES.indexOf(currentStage);
+            if (idx < STAGES.length - 1) {
+                changeStage(STAGES[idx + 1]);
+            } else {
+                // V8: If at End, go to Next Batch
+                nextBatch();
+            }
+        }
+
+        function prevStage() {
+            let idx = STAGES.indexOf(currentStage);
+            if (idx > 0) changeStage(STAGES[idx - 1]);
+        }
+
+        function nextBatch() {
+            if (currentIndex < batches.length - 1) {
+                currentIndex++;
+                // V8: Reset to Moisture for new batch
+                currentStage = 'moisture';
+                renderBatch();
+            }
+        }
+
+        function prevBatch() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                // V8: Reset to Moisture for prev batch too? Usually functionality is symmetric, let's say yes for consistency
+                currentStage = 'moisture';
+                renderBatch();
+            }
+        }
+
+        // --- Common Helpers --- (Same as before)
+        function renderBatchInfo(batch) {
+            const raw = batch.raw_data;
+            const container = document.getElementById('batchDetails');
+            let html = '';
+            const Row = (label, val) => `
+                <div class="flex flex-col border-b border-[#e0e0e0] pb-2 last:border-0">
+                    <span class="text-[10px] text-[#697077] uppercase mb-0.5">${label}</span>
+                    <span class="text-sm text-[#161616] font-normal wrap-text leading-snug font-sans">${val || '--'}</span>
+                </div>`;
+
+            if (TASK_TYPE === 'KALKI') {
+                html += Row("Batch ID", raw['Batch Kiln ID'] || raw['Batch_Kiln_ID']);
+
+                // Robust Time Lookup
+                let dateStr = raw['production_start_date'] || raw['Date'] || '';
+
+                const timeKeys = ['production_time_date', 'production_start_time', 'Production Start Time', 'Time', 'time', 'Start Time'];
+                let foundTime = '';
+                for (let k of timeKeys) {
+                    if (raw[k]) { foundTime = raw[k]; break; }
+                }
+
+                let timeDisplay = dateStr;
+                if (foundTime) {
+                    if (timeDisplay) timeDisplay += ' ' + foundTime;
+                    else timeDisplay = foundTime;
+                }
+
+                html += Row("Date Time Stamp", timeDisplay);
+
+                html += Row("Partner", raw['Partner Name']);
+                html += Row("Kiln", `${raw['Kiln Name']} (${raw['Kiln ID']})`);
+                html += Row("Moisture", raw['wood_moisture']);
+            } else {
+                html += Row("Inv ID", raw['Inventory ID']);
+                html += Row("Start", `${raw['Start Date']} ${raw['Start Time']}`);
+                html += Row("Partner", raw['Partner Name']);
+                html += Row("Kiln", `${raw['Kiln ID']} / ${raw['Slot']}`);
+                html += Row("Moisture", raw['wood_moisture']);
+            }
+            container.innerHTML = html;
+        }
+
+        function updateTabData() {
+            STAGES.forEach(t => {
+                const btn = document.getElementById('tab_' + t);
+                if (t === currentStage) btn.className = "px-4 py-1.5 text-xs font-semibold text-white bg-[#525252] shadow-inner transition";
+                else btn.className = "px-4 py-1.5 text-xs text-[#c6c6c6] hover:text-white hover:bg-[#393939] transition";
+            });
+        }
+
+        // Save (Same)
+        function autoSave() { debouncedAutoSave(0); }
+        function debouncedAutoSave(delay = 800) {
+            const indicator = document.getElementById('saveStatus');
+            indicator.innerHTML = 'Saving...'; indicator.classList.add('visible');
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(performSave, delay);
+        }
+        async function performSave() {
+            const batch = batches[currentIndex];
+            if (!batch) return;
+            const payload = {
+                validation_data: {
+                    [currentStage]: {
+                        status: document.getElementById('statusSelect').value,
+                        reason: document.getElementById('reasonSelect').value,
+                        comment: document.getElementById('commentBox').value,
+                        sub_checks: {
+                            geotag: document.getElementById('checkGeotag').checked,
+                            serial: document.getElementById('checkSerial').checked
+                        }
+                    }
+                },
+                status: "IN_PROGRESS"
+            };
+            if (!batch.validation_data) batch.validation_data = {};
+            batch.validation_data[currentStage] = payload.validation_data[currentStage];
+
+            // Optimistic UI Update for Left Panel & Progress
+            loadStageData(batch);
+            updateProgress();
+
+            try {
+                await fetch(`/api/batches/${batch.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const indicator = document.getElementById('saveStatus');
+                indicator.innerHTML = '<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 15 8a7.008 7.008 0 0 1-7 7zm0-13a6 6 0 1 0 6 6 6 6 0 0 0-6-6z"></path><path d="m6.5 9.8-1.8-1.8L4 8.7l2.5 2.5L12 5.7l-.7-.7z"></path></svg> Saved';
+                setTimeout(() => indicator.classList.remove('visible'), 2000);
+            } catch (e) { console.error(e); }
+        }
+
+        function updateRejectionVisibility() {
+            const status = document.getElementById('statusSelect').value;
+            const reasons = document.getElementById('rejectionSection');
+            if (status === 'Rejected') {
+                reasons.classList.remove('hidden');
+                if (window.updateRejectionReasons) window.updateRejectionReasons(TASK_TYPE, currentStage);
+            } else {
+                reasons.classList.add('hidden');
+            }
+        }
+        function downloadTask() { window.location.href = `/api/tasks/${TASK_ID}/download`; }
+        function fitToScreen() {
+            const cont = document.getElementById('imageContainer');
+            const img = document.getElementById('mainImage');
+            const isRotated = rotation === 90 || rotation === 270;
+            const imgW = isRotated ? img.naturalHeight : img.naturalWidth;
+            const imgH = isRotated ? img.naturalWidth : img.naturalHeight;
+            if (imgW === 0 || imgH === 0) return;
+
+            const scaleX = cont.clientWidth / imgW;
+            const scaleY = cont.clientHeight / imgH;
+            zoom = Math.min(scaleX, scaleY) * 0.95;
+            panX = 0; panY = 0;
+            applyTransform();
+        }
+        function applyTransform() {
+            const img = document.getElementById('mainImage');
+            img.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom}) rotate(${rotation}deg)`;
+        }
+        function zoomIn() { zoom *= 1.25; applyTransform(); }
+        function zoomOut() { if (zoom > 0.05) zoom /= 1.25; applyTransform(); }
+        function resetZoom() { zoom = 1; panX = 0; panY = 0; rotation = 0; applyTransform(); }
+        function rotateImage() { rotation = (rotation + 90) % 360; applyTransform(); }
+        function startPan(e) { e.preventDefault(); if (e.button !== 0) return; isPanning = true; startX = e.clientX - panX; startY = e.clientY - panY; document.body.style.cursor = 'grabbing'; window.addEventListener('mousemove', doPan); window.addEventListener('mouseup', stopPan); }
+        function doPan(e) { if (!isPanning) return; e.preventDefault(); panX = e.clientX - startX; panY = e.clientY - startY; applyTransform(); }
+        function stopPan() { isPanning = false; document.body.style.cursor = ''; window.removeEventListener('mousemove', doPan); window.removeEventListener('mouseup', stopPan); }
+        document.getElementById('imageContainer').addEventListener('wheel', (e) => { e.preventDefault(); const delta = -Math.sign(e.deltaY) * 0.1; zoom += delta; if (zoom < 0.05) zoom = 0.05; if (zoom > 10) zoom = 10; applyTransform(); }, { passive: false });
+        function initResizers() {
+            const resizerLeft = document.getElementById('resizerLeft');
+            const leftPanel = document.getElementById('panelLeft');
+            resizerLeft.addEventListener('mousedown', (e) => {
+                e.preventDefault(); document.body.style.cursor = 'col-resize'; resizerLeft.classList.add('active');
+                const onMove = (e) => leftPanel.style.width = e.clientX + 'px';
+                const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); document.body.style.cursor = ''; resizerLeft.classList.remove('active'); };
+                document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
+            });
+            const resizerRight = document.getElementById('resizerRight');
+            const rightPanel = document.getElementById('panelRight');
+            resizerRight.addEventListener('mousedown', (e) => {
+                e.preventDefault(); document.body.style.cursor = 'col-resize'; resizerRight.classList.add('active');
+                const onMove = (e) => rightPanel.style.width = (document.body.clientWidth - e.clientX) + 'px';
+                const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); document.body.style.cursor = ''; resizerRight.classList.remove('active'); };
+                document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
+            });
+        }
+    </script>
+</body>
+
+</html>
