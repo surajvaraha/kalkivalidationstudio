@@ -22,7 +22,8 @@ Biochar Validation Studio is a specialized desktop-style web application designe
 │   └── templates/
 │       ├── dashboard.html  # Task management UI
 │       └── validation.html # High-efficiency 3-panel validation UI
-├── run_tool.sh            # Automated setup and launch script
+├── run_tool.command       # Automated setup & launch script (macOS/Linux)
+├── run_tool.bat           # Automated setup & launch script (Windows)
 └── biochar.db             # Local SQLite database
 ```
 
@@ -41,9 +42,9 @@ Biochar Validation Studio is a specialized desktop-style web application designe
 
 1. **Environment**:
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install fastapi uvicorn sqlalchemy pandas openpyxl jinja2 python-multipart
+    - **macOS/Linux**: `source venv/bin/activate`
+    - **Windows**: `venv\Scripts\activate`
+    pip install -r requirements.txt
    ```
 
 2. **Run Dev Server**:
@@ -56,3 +57,19 @@ Biochar Validation Studio is a specialized desktop-style web application designe
 
 ## Validation Schema (`app/config.py`)
 Central configuration for all validation logic. To add a new stage or modify rejection reasons, update the `VALIDATION_SCHEMA` and `GENERAL_REJECTION_REASONS` lists in this file.
+
+## Troubleshooting
+
+### macOS Security Warning
+If you see an error like "Apple could not verify 'run_tool.sh' is free of malware" when running the script:
+
+1. **Via Terminal (Recommended)**:
+   Run this command in the project directory:
+   ```bash
+   xattr -d com.apple.quarantine run_tool.sh
+   ```
+
+2. **Via Finder**:
+   - Right-click (or Control-click) `run_tool.sh` in Finder.
+   - Select **Open**.
+   - In the dialog that appears, click **Open**.

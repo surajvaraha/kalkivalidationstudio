@@ -3,11 +3,25 @@
 Welcome to the Biochar Validation Studio! This tool is designed to make your validation workflow faster, more accurate, and entirely keyboard-driven.
 
 ## 1. Getting Started
-To start the application, simply double-click the `run_tool.sh` file or run it from your terminal:
+To start the application, simply double-click the `run_tool.command` (macOS/Linux) or `run_tool.bat` (Windows) file, or run it from your terminal:
+
+**macOS/Linux**:
 ```bash
-./run_tool.sh
+./run_tool.command
+```
+
+**Windows**:
+```cmd
+run_tool.bat
 ```
 This will automatically set up the environment and open the Dashboard in your default web browser.
+
+### Troubleshooting: macOS Security Warning
+If macOS blocks `run_tool.command` from running, you can bypass this by running the following command in your terminal:
+```bash
+xattr -d com.apple.quarantine run_tool.command
+```
+Alternatively, right-click `run_tool.command` in Finder and select **Open**.
 
 ## 2. The Dashboard
 The Dashboard is your control center for validation tasks.

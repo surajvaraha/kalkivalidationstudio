@@ -16,7 +16,7 @@ if [ ! -d "venv" ]; then
     source venv/bin/activate
     
     echo "Installing dependencies..."
-    pip install fastapi uvicorn sqlalchemy pandas openpyxl jinja2 python-multipart
+    pip install -r requirements.txt
 else
     source venv/bin/activate
 fi
