@@ -23,6 +23,11 @@ xattr -d com.apple.quarantine run_tool.command
 ```
 Alternatively, right-click `run_tool.command` in Finder and select **Open**.
 
+#### Windows: Windows SmartScreen
+If a blue "Windows protected your PC" window appears:
+1. Click **More info**.
+2. Click **Run anyway**.
+
 ## 2. The Dashboard
 The Dashboard is your control center for validation tasks.
 - **Upload**: Click "**+ New Validation Task**" to import a Kalki or Looker Excel sheet.

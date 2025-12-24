@@ -73,3 +73,8 @@ If you see an error like "Apple could not verify 'run_tool.sh' is free of malwar
    - Right-click (or Control-click) `run_tool.sh` in Finder.
    - Select **Open**.
    - In the dialog that appears, click **Open**.
+
+### Windows Security Warning (SmartScreen)
+If you see "Windows protected your PC" when running `run_tool.bat`:
+1. Click **More info**.
+2. Click **Run anyway**.
