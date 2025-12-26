@@ -2,6 +2,7 @@ import pandas as pd
 import uuid
 from sqlalchemy.orm import Session
 from app.config import VALIDATION_SCHEMA, STAGES
+from app.models import TaskType, TaskStatus, ValidationTask, BatchRow
 import json
 
 def determine_task_type(columns):
