@@ -545,6 +545,10 @@
                 if (e.key === 'Enter') {
                     let val = parseInt(e.target.value);
                     if (!isNaN(val) && val >= 1 && val <= batches.length) {
+                        if (!validateNavigation()) {
+                            e.target.value = currentIndex + 1;
+                            return;
+                        }
                         currentIndex = val - 1;
                         changeStage('moisture'); // Jump always resets to moisture
                     } else alert("Invalid Row #");
@@ -590,9 +594,9 @@
 
         // --- Smart Rejection ---
         function openRejectionModal() {
-            // Get reasons from validaton_rules.js (via window object populated by JS)
-            // We need to fetch reasons dynamically based on TaskType and Stage
-            // Note: validation_rules.js populates the Select box, we can read from there!
+            // Force population of reasons to ensure shortcuts work even if dropdown wasn't visible
+            if (window.updateRejectionReasons) window.updateRejectionReasons(TASK_TYPE, currentStage);
+
             const select = document.getElementById('reasonSelect');
             const options = Array.from(select.options).filter(o => o.value !== "");
 
@@ -640,6 +644,24 @@
             const el = document.getElementById(id);
             el.checked = !el.checked;
             el.dispatchEvent(new Event('change'));
+        }
+
+        function validateNavigation() {
+            const status = document.getElementById('statusSelect').value;
+            const reason = document.getElementById('reasonSelect').value;
+
+            if (status === 'Rejected' && !reason) {
+                const reasonSelect = document.getElementById('reasonSelect');
+                reasonSelect.classList.add('ring-2', 'ring-red-500', 'ring-inset', 'animate-pulse');
+                setTimeout(() => {
+                    reasonSelect.classList.remove('ring-2', 'ring-red-500', 'ring-inset', 'animate-pulse');
+                }, 2000);
+
+                // Show a small toast or just alert for now as requested
+                alert("Please select a Rejection Reason before moving to the next image/batch.");
+                return false;
+            }
+            return true;
         }
 
 
@@ -706,15 +728,20 @@
             const valData = batch.validation_data || {};
             const stageData = valData[currentStage] || {};
 
+            // Update UI fields from data
             document.getElementById('statusSelect').value = stageData.status || "";
+
+            // Critical: Call visibility & populate reasons BEFORE setting specific reason value
+            updateRejectionVisibility();
+
             document.getElementById('reasonSelect').value = stageData.reason || "";
             document.getElementById('commentBox').value = stageData.comment || "";
+
             const sub = stageData.sub_checks || {};
             document.getElementById('checkGeotag').checked = sub.geotag || false;
             document.getElementById('checkSerial').checked = sub.serial || false;
 
             updateLeftPanelTable(valData);
-            updateRejectionVisibility();
             updateTabData();
         }
 
@@ -745,9 +772,14 @@
         }
 
         // --- V8 Logic ---
-        function changeStage(stage) { currentStage = stage; renderBatch(); }
+        function changeStage(stage) {
+            if (!validateNavigation()) return;
+            currentStage = stage;
+            renderBatch();
+        }
 
         function nextStage() {
+            if (!validateNavigation()) return;
             let idx = STAGES.indexOf(currentStage);
             if (idx < STAGES.length - 1) {
                 changeStage(STAGES[idx + 1]);
@@ -758,11 +790,13 @@
         }
 
         function prevStage() {
+            if (!validateNavigation()) return;
             let idx = STAGES.indexOf(currentStage);
             if (idx > 0) changeStage(STAGES[idx - 1]);
         }
 
         function nextBatch() {
+            if (!validateNavigation()) return;
             if (currentIndex < batches.length - 1) {
                 currentIndex++;
                 // V8: Reset to Moisture for new batch
@@ -772,6 +806,7 @@
         }
 
         function prevBatch() {
+            if (!validateNavigation()) return;
             if (currentIndex > 0) {
                 currentIndex--;
                 // V8: Reset to Moisture for prev batch too? Usually functionality is symmetric, let's say yes for consistency
@@ -785,18 +820,37 @@
             const raw = batch.raw_data;
             const container = document.getElementById('batchDetails');
             let html = '';
-            const Row = (label, val) => `
-                <div class="flex flex-col border-b border-[#e0e0e0] pb-2 last:border-0">
+
+            const Row = (label, val, extraClass = "") => `
+                <div class="flex flex-col border-b border-[#e0e0e0] pb-2 last:border-0 ${extraClass}">
                     <span class="text-[10px] text-[#697077] uppercase mb-0.5">${label}</span>
                     <span class="text-sm text-[#161616] font-normal wrap-text leading-snug font-sans">${val || '--'}</span>
                 </div>`;
 
+            const formatMoisture = (val) => {
+                if (val === undefined || val === null || val === '') return '--';
+                const num = parseFloat(val);
+                return isNaN(num) ? val : num.toFixed(2);
+            };
+
             if (TASK_TYPE === 'KALKI') {
+                // Top Row: Kiln & Moisture with Highlight Backgrounds
+                html += `
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <div class="bg-[#f8f9fa] p-2 rounded border border-[#e0e0e0] border-l-4 border-l-gray-400">
+                        <span class="text-[10px] text-[#697077] uppercase block mb-1 leading-none">Kiln</span>
+                        <span class="text-sm text-[#161616] font-medium block truncate" title="${raw['Kiln Name'] || '--'} (${raw['Kiln ID'] || '--'})">${raw['Kiln Name'] || '--'} (${raw['Kiln ID'] || '--'})</span>
+                    </div>
+                    <div class="bg-[#e6f4ea] p-2 rounded border border-[#ceead6] border-l-4 border-l-[#198038]">
+                        <span class="text-[10px] text-[#198038] uppercase block mb-1 leading-none">Moisture</span>
+                        <span class="text-sm text-[#198038] font-bold block">${formatMoisture(raw['wood_moisture'])}</span>
+                    </div>
+                </div>`;
+
                 html += Row("Batch ID", raw['Batch Kiln ID'] || raw['Batch_Kiln_ID']);
 
                 // Robust Time Lookup
                 let dateStr = raw['production_start_date'] || raw['Date'] || '';
-
                 const timeKeys = ['production_time_date', 'production_start_time', 'Production Start Time', 'Time', 'time', 'Start Time'];
                 let foundTime = '';
                 for (let k of timeKeys) {
@@ -810,16 +864,24 @@
                 }
 
                 html += Row("Date Time Stamp", timeDisplay);
-
                 html += Row("Partner", raw['Partner Name']);
-                html += Row("Kiln", `${raw['Kiln Name']} (${raw['Kiln ID']})`);
-                html += Row("Moisture", raw['wood_moisture']);
             } else {
+                // LOOKER Logic
+                html += `
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <div class="bg-[#f8f9fa] p-2 rounded border border-[#e0e0e0] border-l-4 border-l-gray-400">
+                        <span class="text-[10px] text-[#697077] uppercase block mb-1 leading-none">Kiln</span>
+                        <span class="text-sm text-[#161616] font-medium block truncate" title="${raw['Kiln ID'] || '--'} / ${raw['Slot'] || '--'}">${raw['Kiln ID'] || '--'} / ${raw['Slot'] || '--'}</span>
+                    </div>
+                    <div class="bg-[#e6f4ea] p-2 rounded border border-[#ceead6] border-l-4 border-l-[#198038]">
+                        <span class="text-[10px] text-[#198038] uppercase block mb-1 leading-none">Moisture</span>
+                        <span class="text-sm text-[#198038] font-bold block">${formatMoisture(raw['wood_moisture'])}</span>
+                    </div>
+                </div>`;
+
                 html += Row("Inv ID", raw['Inventory ID']);
                 html += Row("Start", `${raw['Start Date']} ${raw['Start Time']}`);
                 html += Row("Partner", raw['Partner Name']);
-                html += Row("Kiln", `${raw['Kiln ID']} / ${raw['Slot']}`);
-                html += Row("Moisture", raw['wood_moisture']);
             }
             container.innerHTML = html;
         }

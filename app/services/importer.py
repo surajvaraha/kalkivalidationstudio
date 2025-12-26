@@ -89,21 +89,39 @@ def reconstruct_validation_data(row):
     """
     val_data = {}
     
+    # Create a mapping for quick lookup from schema
+    schema_map = {s['key']: s for s in VALIDATION_SCHEMA}
+    
     for stage in STAGES:
-        # Check for {stage}_status or {prefix}_Status
-        # We try capitalized and lower case because users/exporters might vary
-        prefix = stage.capitalize()
-        if stage == '90': prefix = '90_Percent'
+        schema = schema_map.get(stage)
+        status = None
+        reason = ""
+        comment = ""
 
-        status = row.get(f"{stage}_status") or row.get(f"{prefix}_Status")
+        # 1. Try specific column names from schema
+        if schema:
+            status = row.get(schema['status_col'])
+            reason = row.get(schema['reason_col']) or ""
+            comment = row.get(schema['comment_col']) or ""
+
+        # 2. Fallback to generic prefixes if schema lookup failed
+        if not status:
+            prefix = stage.capitalize()
+            if stage == '90': prefix = '90_Percent'
+            status = row.get(f"{stage}_status") or row.get(f"{prefix}_Status")
+            reason = reason or row.get(f"{stage}_reason") or row.get(f"{prefix}_Reason", "")
+            comment = comment or row.get(f"{stage}_comment") or row.get(f"{prefix}_Comment", "")
+
         if status:
             if stage not in val_data: val_data[stage] = {}
             val_data[stage]['status'] = status
-            val_data[stage]['reason'] = row.get(f"{stage}_reason") or row.get(f"{prefix}_Reason", "")
-            val_data[stage]['comment'] = row.get(f"{stage}_comment") or row.get(f"{prefix}_Comment", "")
+            val_data[stage]['reason'] = reason
+            val_data[stage]['comment'] = comment
             
             # Sub checks (Geotag, Serial) - Prefer prefixed keys for robustness
             sub_checks = {}
+            prefix = stage.capitalize()
+            if stage == '90': prefix = '90_Percent'
             
             geo = row.get(f"{stage}_geotag") or row.get(f"{prefix}_Geotag") or row.get("geotag")
             ser = row.get(f"{stage}_serial") or row.get(f"{prefix}_Serial") or row.get("serial")

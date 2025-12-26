@@ -21,20 +21,25 @@ def export_task_excel(task_id: str, db: Session, output_path: str):
         # Merge validation data
         val_data = batch.validation_data or {}
         
-        # Explicitly map validation data to columns using STAGES
-        for stage_key in STAGES:
+        # Explicitly map validation data to columns using VALIDATION_SCHEMA
+        for schema in VALIDATION_SCHEMA:
+            stage_key = schema["key"]
             info = val_data.get(stage_key, {})
             
-            # Normalize prefix for header (e.g. 'start' -> 'Start')
+            status_col = schema["status_col"]
+            reason_col = schema["reason_col"]
+            comment_col = schema["comment_col"]
+
+            # Map validation fields to exact Excel columns
+            row_data[status_col] = info.get("status", "")
+            row_data[reason_col] = info.get("reason", "")
+            row_data[comment_col] = info.get("comment", "")
+            
+            # Normalize prefix for sub-check headers (e.g. 'start' -> 'Start')
             prefix = stage_key.capitalize()
             if stage_key == '90': prefix = '90_Percent' 
 
-            # Standard Columns
-            row_data[f"{prefix}_Status"] = info.get("status", "")
-            row_data[f"{prefix}_Reason"] = info.get("reason", "")
-            row_data[f"{prefix}_Comment"] = info.get("comment", "")
-            
-            # Sub-checks: Prefixed to avoid collision
+            # Sub-checks: Prefixed to avoid collision (these stay as helper columns)
             sub = info.get("sub_checks", {})
             row_data[f"{prefix}_Geotag"] = "Yes" if sub.get("geotag") else "No"
             row_data[f"{prefix}_Serial"] = "Yes" if sub.get("serial") else "No"

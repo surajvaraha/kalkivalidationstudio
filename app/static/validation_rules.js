@@ -73,6 +73,8 @@ const REJECTION_REASONS = {
 // Global function to be called by validation.html
 window.updateRejectionReasons = function(taskType, stage) {
     const select = document.getElementById('reasonSelect');
+    const currentValue = select.value;
+    
     select.innerHTML = '<option value="">Select Reason...</option>';
     
     // Normalize TaskType
@@ -86,4 +88,9 @@ window.updateRejectionReasons = function(taskType, stage) {
         opt.innerText = r;
         select.appendChild(opt);
     });
+
+    // Restore value if it still exists in the new list
+    if (currentValue) {
+        select.value = currentValue;
+    }
 }
