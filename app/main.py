@@ -96,11 +96,28 @@ async def update_batch(batch_id: int, payload: dict, db: Session = Depends(get_d
 @app.get("/api/tasks/{task_id}/download")
 async def download_task(task_id: str, db: Session = Depends(get_db)):
     try:
-        output_path = f"validated_{task_id}.xlsx"
+        # Ensure exports directory exists
+        os.makedirs("exports", exist_ok=True)
+        output_path = f"exports/validated_{task_id}.xlsx"
         exporter.export_task_excel(task_id, db, output_path)
         return FileResponse(output_path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=f"Validated_{task_id}.xlsx")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/tasks/{task_id}")
+async def delete_task(task_id: str, db: Session = Depends(get_db)):
+    task = db.query(ValidationTask).filter(ValidationTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    # ValidationTask cascade delete will handle batches if configured in models.py
+    # checking models.py: batches = relationship("BatchRow", back_populates="task", cascade="all, delete-orphan")
+    # So deleting task is enough.
+    
+    db.delete(task)
+    db.commit()
+    
+    return {"status": "success", "id": task_id}
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

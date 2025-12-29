@@ -128,18 +128,24 @@
                                     Done
                                 </span>
                                 {% else %}
-                                <span class="flex items-center gap-2 text-xs text-[#525252] font-medium">
-                                    <svg class="w-3 h-3 fill-current animate-spin" viewBox="0 0 16 16">
-                                        <path d="M8 1a7 7 0 1 0 7 7 7 7 0 0 0-7-7zm0 13a6 6 0 1 1 6-6 6 6 0 0 1-6 6z"
-                                            opacity=".2"></path>
-                                        <path d="M8 1a7 7 0 0 0 0 14V8a7 7 0 0 0 0-14z"></path>
-                                    </svg>
+                                <span
+                                    class="flex items-center gap-2 text-xs text-[#0f62fe] font-medium bg-[#e0f2ff] px-2 py-1 rounded-full w-fit">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-[#0f62fe]"></span>
                                     In Progress
                                 </span>
                                 {% endif %}
                             </td>
                             <td class="px-4 text-right">
                                 <div class="flex justify-end items-center h-full gap-0">
+                                    <button onclick="deleteTask('{{ task.id }}')"
+                                        class="h-[3rem] w-[3rem] flex items-center justify-center hover:bg-[#ffe6e6] text-[#da1e28] transition border-l border-transparent"
+                                        title="Delete Task">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2"
+                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
                                     <button onclick="downloadTask('{{ task.id }}')"
                                         class="h-[3rem] w-[3rem] flex items-center justify-center hover:bg-[#e0e0e0] text-[#525252] transition border-l border-transparent">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
@@ -255,6 +261,24 @@
 
         async function downloadTask(taskId) {
             window.location.href = `/api/tasks/${taskId}/download`;
+        }
+
+        async function deleteTask(taskId) {
+            if (!confirm("Are you sure you want to delete this task? This action cannot be undone.")) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+                if (res.ok) {
+                    window.location.reload();
+                } else {
+                    const err = await res.json();
+                    alert("Error deleting task: " + (err.detail || "Unknown error"));
+                }
+            } catch (e) {
+                alert("Delete failed");
+            }
         }
     </script>
 </body>
