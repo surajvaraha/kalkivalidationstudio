@@ -456,7 +456,7 @@
                 <div class="space-y-1">
                     <label class="cds-label">Status <span class="cds-key-hint">A / R / Q</span></label>
                     <div class="relative">
-                        <select id="statusSelect" onchange="autoSave()"
+                        <select id="statusSelect" onchange="updateRejectionVisibility(); autoSave();"
                             class="cds-select border-b border-[#8d8d8d] focus:border-[#198038]">
                             <option value="">Select...</option>
                             <option value="Approved" class="text-[#198038] font-medium">Approved</option>
@@ -487,21 +487,6 @@
                     </div>
                 </div>
 
-                <!-- Checks -->
-                <div class="space-y-3 pt-4 border-t border-[#e0e0e0]">
-                    <legend class="cds-label">Checks</legend>
-                    <div class="flex items-center gap-3">
-                        <input type="checkbox" id="checkGeotag" class="cds-checkbox" onchange="autoSave()">
-                        <label for="checkGeotag" class="text-xs text-[#161616] cursor-pointer">Geotag Present <span
-                                class="cds-key-hint">G</span></label>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <input type="checkbox" id="checkSerial" class="cds-checkbox" onchange="autoSave()">
-                        <label for="checkSerial" class="text-xs text-[#161616] cursor-pointer">Serial # Valid <span
-                                class="cds-key-hint">S</span></label>
-                    </div>
-                </div>
-
                 <!-- Comments -->
                 <div class="space-y-1 pt-4">
                     <label class="cds-label">Comments</label>
@@ -517,6 +502,7 @@
                 <span>&larr;/&rarr; : Stage</span>
                 <span>A : Approve</span>
                 <span>R : Smart Reject</span>
+                <span>Q : Under Query</span>
             </div>
         </div>
     </div>
@@ -559,7 +545,11 @@
             // GLOBAL KEYBOARD
             document.addEventListener('keydown', (e) => {
                 const target = e.target;
-                if (target.matches('input, textarea, select')) return;
+                const key = e.key.toLowerCase();
+                const isARQ = (key === 'a' || key === 'r' || key === 'q');
+                // Skip shortcuts only when typing in input/textarea (comment); allow A/R/Q when focus is on select
+                if (target.matches('input, textarea')) return;
+                if (!isARQ && target.matches('select')) return;
 
                 // If Modal is Open, handle numbers
                 const modal = document.getElementById('rejectionModal');
@@ -571,8 +561,6 @@
                     return;
                 }
 
-                const key = e.key.toLowerCase();
-
                 // Nav
                 if (e.shiftKey) {
                     if (e.key === 'ArrowRight') nextBatch();
@@ -583,12 +571,10 @@
                     if (e.key === 'ArrowLeft') prevStage();
                 }
 
-                // Actions
-                if (key === 'a') setStatus('Approved');
-                if (key === 'r') openRejectionModal(); // New Smart Flow
-                if (key === 'q') setStatus('Under Query');
-                if (key === 'g') toggleCheck('checkGeotag');
-                if (key === 's') toggleCheck('checkSerial');
+                // A = Approve, R = Reject (modal), Q = Under Query
+                if (key === 'a') { e.preventDefault(); setStatus('Approved'); return; }
+                if (key === 'r') { e.preventDefault(); openRejectionModal(); return; }
+                if (key === 'q') { e.preventDefault(); setStatus('Under Query'); return; }
             });
         });
 
@@ -637,13 +623,10 @@
 
         function setStatus(val) {
             const el = document.getElementById('statusSelect');
+            if (!el) return;
             el.value = val;
             el.dispatchEvent(new Event('change'));
-        }
-        function toggleCheck(id) {
-            const el = document.getElementById(id);
-            el.checked = !el.checked;
-            el.dispatchEvent(new Event('change'));
+            updateRejectionVisibility();
         }
 
         function validateNavigation() {
@@ -736,10 +719,6 @@
 
             document.getElementById('reasonSelect').value = stageData.reason || "";
             document.getElementById('commentBox').value = stageData.comment || "";
-
-            const sub = stageData.sub_checks || {};
-            document.getElementById('checkGeotag').checked = sub.geotag || false;
-            document.getElementById('checkSerial').checked = sub.serial || false;
 
             updateLeftPanelTable(valData);
             updateTabData();
@@ -910,11 +889,7 @@
                     [currentStage]: {
                         status: document.getElementById('statusSelect').value,
                         reason: document.getElementById('reasonSelect').value,
-                        comment: document.getElementById('commentBox').value,
-                        sub_checks: {
-                            geotag: document.getElementById('checkGeotag').checked,
-                            serial: document.getElementById('checkSerial').checked
-                        }
+                        comment: document.getElementById('commentBox').value
                     }
                 },
                 status: "IN_PROGRESS"

@@ -1,137 +1,197 @@
+import re
+import math
 import pandas as pd
+import numpy as np
 import uuid
+from datetime import datetime, date, time as dt_time
 from sqlalchemy.orm import Session
 from app.config import VALIDATION_SCHEMA, STAGES
 from app.models import TaskType, TaskStatus, ValidationTask, BatchRow
-import json
+
+
+# ─── JSON Safety ────────────────────────────────────────────────────────────
+
+def _make_json_safe(obj):
+    """
+    Recursively convert any non-JSON-serializable Python/Pandas/NumPy value
+    so the dict can be stored in an SQLite JSON column without errors.
+    """
+    if obj is None:
+        return ""
+
+    # float NaN / Inf
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return ""
+        return obj
+
+    # Python stdlib date/time types
+    if isinstance(obj, (datetime, date, dt_time)):
+        return str(obj)
+
+    # Pandas Timestamp / Timedelta / NaT
+    if isinstance(obj, pd.Timestamp):
+        return str(obj) if not pd.isna(obj) else ""
+    if isinstance(obj, pd.Timedelta):
+        return str(obj)
+    if obj is pd.NaT:
+        return ""
+
+    # NumPy scalars (np.int64, np.float64, np.bool_, etc.)
+    if isinstance(obj, (np.integer, np.floating, np.bool_)):
+        val = obj.item()
+        if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+            return ""
+        return val
+
+    # Containers
+    if isinstance(obj, dict):
+        return {str(k): _make_json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_make_json_safe(v) for v in obj]
+
+    return obj
+
+
+# ─── Task Type Detection ───────────────────────────────────────────────────
 
 def determine_task_type(columns):
-    """
-    Heuristic to determine if the sheet is Kalki or Looker based on columns.
-    """
-    col_str = " ".join(columns).lower()
-    
+    """Detect Kalki vs Looker from column names."""
+    col_str = " ".join(str(c) for c in columns).lower()
     if "batch_kiln_id" in col_str or "batch kiln id" in col_str:
         return TaskType.KALKI
-    elif "inventory id" in col_str or "artisan pro" in col_str:
+    if "inventory id" in col_str or "artisan pro" in col_str:
         return TaskType.LOOKER
     return TaskType.UNKNOWN
 
+
+# ─── Main Import ───────────────────────────────────────────────────────────
+
 def import_excel_task(file_path: str, filename: str, db: Session):
-    """
-    Reads an Excel file, creates a ValidationTask, and populates BatchRows.
-    """
+    """Read an Excel file, create a ValidationTask, and populate BatchRows."""
     try:
         df = pd.read_excel(file_path)
     except Exception as e:
         raise ValueError(f"Failed to read Excel: {e}")
-        
-    # Nano-fix for NaNs
-    df = df.fillna("")
-    
-    # Determine Type
+
+    # Normalize column whitespace (e.g. "3.90%  (Image)_Status" → "3.90% (Image)_Status")
+    df.columns = [re.sub(r"\s+", " ", str(c).strip()) for c in df.columns]
+
+    # Determine type
     columns = df.columns.tolist()
     task_type = determine_task_type(columns)
-    
-    # Create Task
+
+    # Create task
     task_id = str(uuid.uuid4())
     new_task = ValidationTask(
         id=task_id,
         filename=filename,
         task_type=task_type,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     db.add(new_task)
     db.flush()
-    
-    # Create Batch Rows
+
+    # Build schema lookup for image normalisation
+    schema_map = {s["key"]: s for s in VALIDATION_SCHEMA}
+
     batch_rows = []
     for idx, row in df.iterrows():
         row_dict = row.to_dict()
-        
-        # Normalize row_dict: Fuzzy Image Search based on Schema
+
+        # Fuzzy image mapping: for each schema stage, copy the first matching
+        # image column to a normalised key like "moisture_1_image"
         for schema in VALIDATION_SCHEMA:
             target_key = f"{schema['key']}_image"
-            # If the target image key isn't there, search for it
-            if target_key not in row_dict or not row_dict[target_key]:
-                for pattern in schema['image_patterns']:
-                    if pattern in row_dict and row_dict[pattern]:
-                        row_dict[target_key] = row_dict[pattern]
+            if target_key not in row_dict or not row_dict.get(target_key):
+                for pattern in schema["image_patterns"]:
+                    val = row_dict.get(pattern)
+                    if val is not None and val != "" and not (isinstance(val, float) and math.isnan(val)):
+                        row_dict[target_key] = val
                         break
 
-        # Serialize specific types
-        for k, v in row_dict.items():
-            if pd.isna(v):
-                row_dict[k] = ""
-            elif isinstance(v, (pd.Timestamp, pd.Timedelta)):
-                row_dict[k] = str(v)
+        # Make everything JSON-safe (datetime.time, numpy int64, NaN, etc.)
+        raw_data = _make_json_safe(row_dict)
+
+        # Reconstruct any existing validation data from flat columns
+        validation_data = _make_json_safe(_reconstruct_validation(row_dict))
 
         batch_row = BatchRow(
             task_id=task_id,
             row_index=idx,
-            raw_data=row_dict,
-            validation_data=reconstruct_validation_data(row_dict),
-            status="IN_PROGRESS" if has_validation_data(row_dict) else "PENDING"
+            raw_data=raw_data,
+            validation_data=validation_data,
+            status="IN_PROGRESS" if _has_validation_cols(row_dict) else "PENDING",
         )
         batch_rows.append(batch_row)
-        
+
     db.add_all(batch_rows)
     db.commit()
     return new_task
 
-def has_validation_data(row):
-    return any("_status" in k.lower() for k in row.keys() if row[k])
 
-def reconstruct_validation_data(row):
+# ─── Helpers ────────────────────────────────────────────────────────────────
+
+def _has_validation_cols(row):
+    """True if the row already has any *_status-ish column with a value."""
+    for k, v in row.items():
+        if v and ("status" in str(k).lower()):
+            return True
+    return False
+
+
+def _reconstruct_validation(row):
     """
-    Reverse engineering the flat excel columns back to nested validation_data.
-    Supports both global keys and stage-prefixed keys.
+    Reverse-engineer flat Excel validation columns back into nested
+    validation_data dict.  Handles both old template columns and new ones.
     """
     val_data = {}
-    
-    # Create a mapping for quick lookup from schema
-    schema_map = {s['key']: s for s in VALIDATION_SCHEMA}
-    
+    schema_map = {s["key"]: s for s in VALIDATION_SCHEMA}
+
     for stage in STAGES:
         schema = schema_map.get(stage)
-        status = None
-        reason = ""
-        comment = ""
+        if not schema:
+            continue
 
-        # 1. Try specific column names from schema
-        if schema:
-            status = row.get(schema['status_col'])
-            reason = row.get(schema['reason_col']) or ""
-            comment = row.get(schema['comment_col']) or ""
+        # Try schema column names
+        status = _first_val(row, schema["status_col"])
+        reason = _first_val(row, schema["reason_col"]) or ""
+        comment = _first_val(row, schema["comment_col"]) or ""
 
-        # 2. Fallback to generic prefixes if schema lookup failed
         if not status:
-            prefix = stage.capitalize()
-            if stage == '90': prefix = '90_Percent'
-            status = row.get(f"{stage}_status") or row.get(f"{prefix}_Status")
-            reason = reason or row.get(f"{stage}_reason") or row.get(f"{prefix}_Reason", "")
-            comment = comment or row.get(f"{stage}_comment") or row.get(f"{prefix}_Comment", "")
+            continue
 
-        if status:
-            if stage not in val_data: val_data[stage] = {}
-            val_data[stage]['status'] = status
-            val_data[stage]['reason'] = reason
-            val_data[stage]['comment'] = comment
-            
-            # Sub checks (Geotag, Serial) - Prefer prefixed keys for robustness
-            sub_checks = {}
-            prefix = stage.capitalize()
-            if stage == '90': prefix = '90_Percent'
-            
-            geo = row.get(f"{stage}_geotag") or row.get(f"{prefix}_Geotag") or row.get("geotag")
-            ser = row.get(f"{stage}_serial") or row.get(f"{prefix}_Serial") or row.get("serial")
-            
-            if geo is not None:
-                sub_checks['geotag'] = str(geo).lower() in ['true', 'yes', '1']
-            if ser is not None:
-                sub_checks['serial'] = str(ser).lower() in ['true', 'yes', '1']
-            
-            if sub_checks:
-                val_data[stage]['sub_checks'] = sub_checks
+        entry = {"status": status, "reason": reason, "comment": comment}
+
+        # Sub-checks (geotag / serial)
+        geo_col = schema.get("geotag_col")
+        ser_col = schema.get("serial_col")
+        sub = {}
+        if geo_col:
+            g = _first_val(row, geo_col)
+            if g is not None:
+                sub["geotag"] = str(g).strip().lower() in ("true", "yes", "1")
+        if ser_col:
+            s = _first_val(row, ser_col)
+            if s is not None:
+                sub["serial"] = str(s).strip().lower() in ("true", "yes", "1")
+        if sub:
+            entry["sub_checks"] = sub
+
+        val_data[stage] = entry
 
     return val_data
+
+
+def _first_val(row, *keys):
+    """Return the first non-empty value from row for any of the given keys."""
+    for k in keys:
+        v = row.get(k)
+        if v is not None and v != "":
+            try:
+                if isinstance(v, float) and math.isnan(v):
+                    continue
+            except (TypeError, ValueError):
+                pass
+            return v
+    return None

@@ -77,10 +77,10 @@ window.updateRejectionReasons = function(taskType, stage) {
     
     select.innerHTML = '<option value="">Select Reason...</option>';
     
-    // Normalize TaskType
+    // Normalize TaskType and stage (moisture_1..5 use same reasons as moisture)
     const type = (taskType === 'KALKI') ? 'KALKI' : 'LOOKER';
-    
-    const reasons = REJECTION_REASONS[type][stage] || [];
+    const stageKey = (stage && typeof stage === 'string' && stage.startsWith('moisture')) ? 'moisture' : stage;
+    const reasons = REJECTION_REASONS[type][stageKey] || [];
     
     reasons.forEach(r => {
         const opt = document.createElement('option');

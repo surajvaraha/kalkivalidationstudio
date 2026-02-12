@@ -30,13 +30,14 @@ Biochar Validation Studio is a specialized desktop-style web application designe
 ## Key Services
 
 ### Importer (`app/services/importer.py`)
-- Automatically detects if an uploaded file is **Kalki** or **Looker** format.
-- Uses **Fuzzy Image Mapping** to find image URLs even if column names vary.
-- Reconstructs nested validation states from flattened Excel columns for existing/partially validated sheets.
+- Automatically detects **Kalki** vs **Looker** from column names (`batch_kiln_id` / `inventory id`).
+- **Fuzzy image mapping**: Maps image columns (e.g. `Wood Moisture Image 1`, `Process Start (Image)`) to normalised keys so all stage images load in the validation UI.
+- Handles **datetime and numpy types** so Excel dates/times and numeric columns are stored safely in JSON.
+- **Supported input**: Aligned with Kalki input sheets (e.g. `Kalki Input Sheet for 11 Feb 2026.xlsx`): `Batch Kiln ID`, `production_start_date`, `production_time_date`, `wood_moisture`, `moisture_reading_1`–`5`, `Wood Moisture Image 1`–`5`, `Process Start (Image)`, `Process Middle (Image)`, `90% Done (Image)`, `Process End (Image)`, `calculated_volume`, `Model Processed (Image)`, `submission_datetime`, etc.
 
 ### Exporter (`app/services/exporter.py`)
-- Flattens the nested validation database into a flat Excel format.
-- Uses **Stage Prefixing** (e.g., `Start_Status`, `Mid_Geotag`) to prevent column collisions across different validation stages.
+- **Output = input columns + validation columns.** All original columns are preserved; then Status, Remark, Comment, Geotag, Serial per stage are appended so the sheet clearly shows user responses.
+- For **Kalki** tasks, column order matches the official input sheet; validation columns use clear names (e.g. `Moisture 1 Status`, `Process Start Remark`, `Process End Geotag`).
 
 ## Development Setup
 
