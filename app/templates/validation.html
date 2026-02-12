@@ -491,8 +491,8 @@
                 class="p-4 border-t border-[#e0e0e0] bg-[#f8f8f8] text-xs text-[#525252] grid grid-cols-2 gap-2 font-medium">
                 <span>Shift + &larr;/&rarr; : Batch</span>
                 <span>&larr;/&rarr; : Stage</span>
-                <span>A : Approve</span>
-                <span>R : Smart Reject</span>
+                <span>A : Accept / Approve</span>
+                <span>R : Reject (with reason)</span>
                 <span>Q : Under Query</span>
             </div>
         </div>
@@ -581,8 +581,10 @@
                     if (e.key === 'ArrowLeft') prevStage();
                 }
 
-                // A = Approve, R = Reject (modal), Q = Under Query
-                if (key === 'a') { e.preventDefault(); setStatus('Approved'); return; }
+                // A = Accept (Yes for moisture, Approved for process)
+                // R = Reject (opens modal; No for moisture, Rejected for process)
+                // Q = Under Query (both)
+                if (key === 'a') { e.preventDefault(); setStatus(isMoistureStage(currentStage) ? 'Yes' : 'Approved'); return; }
                 if (key === 'r') { e.preventDefault(); openRejectionModal(); return; }
                 if (key === 'q') { e.preventDefault(); setStatus('Under Query'); return; }
             });
@@ -619,16 +621,20 @@
             const select = document.getElementById('reasonSelect');
             const validOptions = Array.from(select.options).filter(o => o.value !== "");
             if (idx < validOptions.length) {
-                // First set status to Rejected
-                document.getElementById('statusSelect').value = 'Rejected';
+                // Set status: moisture uses "No", process uses "Rejected"
+                const rejectedVal = isMoistureStage(currentStage) ? 'No' : 'Rejected';
+                document.getElementById('statusSelect').value = rejectedVal;
                 // Then set reason
                 select.value = validOptions[idx].value;
-                // Trigger Save
+                // Refresh UI to show rejection fields, then save
+                updateRejectionVisibility();
                 autoSave();
                 closeRejectionModal();
-                // Refresh UI to show rejection fields
-                updateRejectionVisibility();
             }
+        }
+
+        function isMoistureStage(stage) {
+            return !stage || stage === 'moisture' || (typeof stage === 'string' && stage.startsWith('moisture_'));
         }
 
         function setStatus(val) {

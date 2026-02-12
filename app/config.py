@@ -114,8 +114,6 @@ VALIDATION_SCHEMA = [
         "reason_col": "Process Start Remark",
         "reason_options": GENERAL_REJECTION_REASONS,
         "comment_col": "Process Start Comment",
-        "geotag_col": "Process Start Geotag",
-        "serial_col": "Process Start Serial",
     },
     {
         "key": "mid",
@@ -127,8 +125,6 @@ VALIDATION_SCHEMA = [
         "reason_col": "Process Middle Remark",
         "reason_options": GENERAL_REJECTION_REASONS,
         "comment_col": "Process Middle Comment",
-        "geotag_col": "Process Middle Geotag",
-        "serial_col": "Process Middle Serial",
     },
     {
         "key": "90",
@@ -140,8 +136,6 @@ VALIDATION_SCHEMA = [
         "reason_col": "90% Done Remark",
         "reason_options": GENERAL_REJECTION_REASONS,
         "comment_col": "90% Done Comment",
-        "geotag_col": "90% Done Geotag",
-        "serial_col": "90% Done Serial",
     },
     {
         "key": "end",
@@ -153,7 +147,5 @@ VALIDATION_SCHEMA = [
         "reason_col": "Process End Remark",
         "reason_options": GENERAL_REJECTION_REASONS,
         "comment_col": "Process End Comment",
-        "geotag_col": "Process End Geotag",
-        "serial_col": "Process End Serial",
     },
 ]

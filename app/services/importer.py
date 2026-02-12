@@ -162,22 +162,6 @@ def _reconstruct_validation(row):
             continue
 
         entry = {"status": status, "reason": reason, "comment": comment}
-
-        # Sub-checks (geotag / serial)
-        geo_col = schema.get("geotag_col")
-        ser_col = schema.get("serial_col")
-        sub = {}
-        if geo_col:
-            g = _first_val(row, geo_col)
-            if g is not None:
-                sub["geotag"] = str(g).strip().lower() in ("true", "yes", "1")
-        if ser_col:
-            s = _first_val(row, ser_col)
-            if s is not None:
-                sub["serial"] = str(s).strip().lower() in ("true", "yes", "1")
-        if sub:
-            entry["sub_checks"] = sub
-
         val_data[stage] = entry
 
     return val_data
