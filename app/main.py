@@ -11,6 +11,7 @@ import uuid
 from app.database import init_db, get_db
 from app.models import ValidationTask, BatchRow
 from app.services import importer, exporter
+from app.config import get_stages_for_task_type
 
 # Initialize Database
 init_db()
@@ -31,7 +32,8 @@ async def read_validation_ui(task_id: str, request: Request, db: Session = Depen
     task = db.query(ValidationTask).filter(ValidationTask.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    return templates.TemplateResponse("validation.html", {"request": request, "task": task})
+    stages = get_stages_for_task_type(task.task_type)
+    return templates.TemplateResponse("validation.html", {"request": request, "task": task, "stages": stages})
 
 # --- API ---
 
@@ -56,15 +58,16 @@ async def get_batches(task_id: str, page: int = 0, limit: int = 100, db: Session
     offset = page * limit
     batches = db.query(BatchRow).filter(BatchRow.task_id == task_id).offset(offset).limit(limit).all()
     
-    # Return simple list of dicts
+    # Return simple list of dicts (ensure no null for JSON fields so frontend doesn't throw)
     data = []
     for b in batches:
+        status_val = b.status.value if hasattr(b.status, "value") else str(b.status)
         item = {
             "id": b.id,
             "row_index": b.row_index,
-            "raw_data": b.raw_data,
-            "validation_data": b.validation_data,
-            "status": b.status
+            "raw_data": b.raw_data if b.raw_data is not None else {},
+            "validation_data": b.validation_data if b.validation_data is not None else {},
+            "status": status_val
         }
         data.append(item)
         

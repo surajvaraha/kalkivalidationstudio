@@ -344,19 +344,10 @@
                 </div>
             </div>
 
-            <!-- Tabs -->
-            <div class="bg-[#161616] border-b border-[#393939] p-2 flex justify-center z-10 shrink-0">
-                <div class="flex bg-[#393939] gap-[1px]">
-                    <button onclick="changeStage('moisture')" id="tab_moisture"
-                        class="px-4 py-1.5 text-xs text-[#c6c6c6] hover:text-white hover:bg-[#525252] transition">Moist</button>
-                    <button onclick="changeStage('start')" id="tab_start"
-                        class="px-4 py-1.5 text-xs text-[#c6c6c6] hover:text-white hover:bg-[#525252] transition">Start</button>
-                    <button onclick="changeStage('mid')" id="tab_mid"
-                        class="px-4 py-1.5 text-xs text-[#c6c6c6] hover:text-white hover:bg-[#525252] transition">Mid</button>
-                    <button onclick="changeStage('90')" id="tab_90"
-                        class="px-4 py-1.5 text-xs text-[#c6c6c6] hover:text-white hover:bg-[#525252] transition">90%</button>
-                    <button onclick="changeStage('end')" id="tab_end"
-                        class="px-4 py-1.5 text-xs text-[#c6c6c6] hover:text-white hover:bg-[#525252] transition">End</button>
+            <!-- Tabs (filled by JS from server stages: Kalki = M1..M5, Start, Mid, 90%, End) -->
+            <div class="bg-[#161616] border-b border-[#393939] p-2 flex justify-center z-10 shrink-0 overflow-x-auto">
+                <div id="tabsContainer" class="flex bg-[#393939] gap-[1px] flex-wrap justify-center">
+                    <!-- Buttons created by renderTabs() -->
                 </div>
             </div>
 
@@ -511,17 +502,37 @@
     <script>
         const TASK_ID = "{{ task.id }}";
         const TASK_TYPE = "{{ task.task_type.value }}";
+        const STAGES = {{ stages | tojson }};
 
         let batches = [];
         let currentIndex = 0;
-        let currentStage = 'moisture';
-        const STAGES = ['moisture', 'start', 'mid', '90', 'end'];
+        let currentStage = (STAGES && STAGES.length) ? STAGES[0] : 'moisture';
 
         let zoom = 1, panX = 0, panY = 0, rotation = 0;
         let isPanning = false, startX = 0, startY = 0;
         let saveTimeout;
 
+        function getStageLabel(key) {
+            const L = { 'moisture': 'Moist', 'moisture_1': 'M1', 'moisture_2': 'M2', 'moisture_3': 'M3', 'moisture_4': 'M4', 'moisture_5': 'M5', 'start': 'Start', 'mid': 'Mid', '90': '90%', 'end': 'End' };
+            return L[key] || key;
+        }
+
+        function renderTabs() {
+            const container = document.getElementById('tabsContainer');
+            if (!container || !STAGES.length) return;
+            container.innerHTML = '';
+            STAGES.forEach(s => {
+                const btn = document.createElement('button');
+                btn.setAttribute('onclick', "changeStage('" + s + "')");
+                btn.id = 'tab_' + s;
+                btn.className = "px-3 py-1.5 text-xs text-[#c6c6c6] hover:text-white hover:bg-[#525252] transition whitespace-nowrap";
+                btn.textContent = getStageLabel(s);
+                container.appendChild(btn);
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
+            renderTabs();
             initResizers();
             await loadBatches();
             renderBatch();
@@ -536,7 +547,7 @@
                             return;
                         }
                         currentIndex = val - 1;
-                        changeStage('moisture'); // Jump always resets to moisture
+                        changeStage(STAGES[0]); // Jump resets to first stage
                     } else alert("Invalid Row #");
                     e.target.blur();
                 }
@@ -547,7 +558,6 @@
                 const target = e.target;
                 const key = e.key.toLowerCase();
                 const isARQ = (key === 'a' || key === 'r' || key === 'q');
-                // Skip shortcuts only when typing in input/textarea (comment); allow A/R/Q when focus is on select
                 if (target.matches('input, textarea')) return;
                 if (!isARQ && target.matches('select')) return;
 
@@ -632,8 +642,9 @@
         function validateNavigation() {
             const status = document.getElementById('statusSelect').value;
             const reason = document.getElementById('reasonSelect').value;
+            const isRejected = (status === 'Rejected') || (status === 'No'); // No = rejected for moisture
 
-            if (status === 'Rejected' && !reason) {
+            if (isRejected && !reason) {
                 const reasonSelect = document.getElementById('reasonSelect');
                 reasonSelect.classList.add('ring-2', 'ring-red-500', 'ring-inset', 'animate-pulse');
                 setTimeout(() => {
@@ -674,6 +685,7 @@
         function renderBatch() {
             if (!batches.length) return;
             const batch = batches[currentIndex];
+            if (!batch) return;
             document.getElementById('jumpInput').value = batch.row_index + 1;
             document.getElementById('progressBar').style.width = `${((currentIndex + 1) / batches.length) * 100}%`;
 
@@ -681,20 +693,33 @@
             loadStageData(batch);
         }
 
+        function setStatusOptionsForStage(stage) {
+            const sel = document.getElementById('statusSelect');
+            const isMoisture = !stage || stage === 'moisture' || (typeof stage === 'string' && stage.startsWith('moisture_'));
+            const options = isMoisture
+                ? [['', 'Select...'], ['Yes', 'Yes'], ['No', 'No'], ['Under Query', 'Under Query']]
+                : [['', 'Select...'], ['Approved', 'Approved'], ['Rejected', 'Rejected'], ['Link error', 'Link Error'], ['Under Query', 'Under Query']];
+            sel.innerHTML = options.map(([val, text]) => `<option value="${val}">${text}</option>`).join('');
+        }
+
         // --- View Logic ---
         function loadStageData(batch) {
-            // ... (Same Image Logic as V7) ...
+            const raw = batch.raw_data || {};
+            // Importer normalizes image URLs to moisture_image, moisture_1_image, start_image, etc.
             const STAGE_CONFIG = {
-                'moisture': { col: 'Wood Moisture Image', alt_col: 'Wood Moisture (Image)' },
-                'start': { col: 'Process Start (Image)' },
-                'mid': { col: 'Process Middle (Image)' },
-                '90': { col: '90% Done (Image)', alt_col: ' 90%End(Image)' },
-                'end': { col: 'Process End (Image)' }
+                'moisture': { col: 'Wood Moisture Image', alt_col: 'Wood Moisture (Image)', normalized: 'moisture_image' },
+                'moisture_1': { col: 'Wood Moisture Image 1', normalized: 'moisture_1_image' },
+                'moisture_2': { col: 'Wood Moisture Image 2', normalized: 'moisture_2_image' },
+                'moisture_3': { col: 'Wood Moisture Image 3', normalized: 'moisture_3_image' },
+                'moisture_4': { col: 'Wood Moisture Image 4', normalized: 'moisture_4_image' },
+                'moisture_5': { col: 'Wood Moisture Image 5', normalized: 'moisture_5_image' },
+                'start': { col: 'Process Start (Image)', alt_col: 'Process Start Image Link', normalized: 'start_image' },
+                'mid': { col: 'Process Middle (Image)', alt_col: 'Process Middle Image Link', normalized: 'mid_image' },
+                '90': { col: '90% Done (Image)', alt_col: '90% Done Image Link', normalized: '90_image' },
+                'end': { col: 'Process End (Image)', alt_col: 'Process End Image Link', normalized: 'end_image' }
             };
             const cfg = STAGE_CONFIG[currentStage];
-            let url = null;
-            if (batch.raw_data[cfg.col]) url = batch.raw_data[cfg.col];
-            else if (cfg.alt_col && batch.raw_data[cfg.alt_col]) url = batch.raw_data[cfg.alt_col];
+            let url = (cfg && raw[cfg.col]) || (cfg && cfg.alt_col && raw[cfg.alt_col]) || (cfg && cfg.normalized && raw[cfg.normalized]) || null;
 
             const img = document.getElementById('mainImage');
             const msg = document.getElementById('noImageMessage');
@@ -711,7 +736,8 @@
             const valData = batch.validation_data || {};
             const stageData = valData[currentStage] || {};
 
-            // Update UI fields from data
+            // Moisture stages use Yes/No/Under Query; process stages use Approved/Rejected/etc.
+            setStatusOptionsForStage(currentStage);
             document.getElementById('statusSelect').value = stageData.status || "";
 
             // Critical: Call visibility & populate reasons BEFORE setting specific reason value
@@ -735,15 +761,15 @@
                 let badgeClass = 'status-pending';
                 let badgeText = 'Pending';
 
-                if (status === 'Approved') { badgeClass = 'status-approved'; badgeText = 'Approved'; }
-                else if (status === 'Rejected') { badgeClass = 'status-rejected'; badgeText = 'Rejected'; }
+                if (status === 'Approved' || status === 'Yes') { badgeClass = 'status-approved'; badgeText = status === 'Yes' ? 'Yes' : 'Approved'; }
+                else if (status === 'Rejected' || status === 'No') { badgeClass = 'status-rejected'; badgeText = status === 'No' ? 'No' : 'Rejected'; }
                 else if (status) { badgeClass = 'bg-blue-100 text-blue-800 status-badge'; badgeText = status; }
 
                 // Highlight current row
                 if (s === currentStage) tr.className = "bg-[#f0f0f0] font-bold";
 
                 tr.innerHTML = `
-                    <td class="capitalize text-[10px]">${s}</td>
+                    <td class="capitalize text-[10px]">${getStageLabel(s)}</td>
                     <td><span class="${badgeClass} status-badge">${badgeText}</span></td>
                 `;
                 tbody.appendChild(tr);
@@ -778,8 +804,7 @@
             if (!validateNavigation()) return;
             if (currentIndex < batches.length - 1) {
                 currentIndex++;
-                // V8: Reset to Moisture for new batch
-                currentStage = 'moisture';
+                currentStage = STAGES[0];
                 renderBatch();
             }
         }
@@ -788,15 +813,21 @@
             if (!validateNavigation()) return;
             if (currentIndex > 0) {
                 currentIndex--;
-                // V8: Reset to Moisture for prev batch too? Usually functionality is symmetric, let's say yes for consistency
-                currentStage = 'moisture';
+                currentStage = STAGES[0];
                 renderBatch();
             }
         }
 
-        // --- Common Helpers --- (Same as before)
+        // --- Common Helpers ---
+        function getRaw(raw, ...keys) {
+            for (const k of keys) {
+                if (raw[k] !== undefined && raw[k] !== null && raw[k] !== '') return raw[k];
+            }
+            return '';
+        }
+
         function renderBatchInfo(batch) {
-            const raw = batch.raw_data;
+            const raw = batch.raw_data || {};
             const container = document.getElementById('batchDetails');
             let html = '';
 
@@ -806,61 +837,73 @@
                     <span class="text-sm text-[#161616] font-normal wrap-text leading-snug font-sans">${val || '--'}</span>
                 </div>`;
 
-            const formatMoisture = (val) => {
+            const formatNum = (val) => {
                 if (val === undefined || val === null || val === '') return '--';
                 const num = parseFloat(val);
-                return isNaN(num) ? val : num.toFixed(2);
+                return isNaN(num) ? String(val) : num.toFixed(2);
             };
 
             if (TASK_TYPE === 'KALKI') {
-                // Top Row: Kiln & Moisture with Highlight Backgrounds
+                // Real Kalki input uses: Kiln Name, Kiln ID, wood_moisture, moisture_reading_1..5,
+                // production_start_date, production_time_date, submission_datetime, Partner Name, Facility Name, etc.
+                const kilnName = getRaw(raw, 'Kiln Name', 'Kiln_Name');
+                const kilnId = getRaw(raw, 'Kiln ID', 'Kiln_ID');
+                const moistureVal = getRaw(raw, 'wood_moisture', 'Wood_Moisture', 'moisture_reading_1', 'Moisture_reading_1');
+
                 html += `
                 <div class="grid grid-cols-2 gap-2 mb-3">
                     <div class="bg-[#f8f9fa] p-2 rounded border border-[#e0e0e0] border-l-4 border-l-gray-400">
                         <span class="text-[10px] text-[#697077] uppercase block mb-1 leading-none">Kiln</span>
-                        <span class="text-sm text-[#161616] font-medium block truncate" title="${raw['Kiln Name'] || '--'} (${raw['Kiln ID'] || '--'})">${raw['Kiln Name'] || '--'} (${raw['Kiln ID'] || '--'})</span>
+                        <span class="text-sm text-[#161616] font-medium block truncate" title="${kilnName || '--'} (${kilnId || '--'})">${kilnName || '--'} (${kilnId || '--'})</span>
                     </div>
                     <div class="bg-[#e6f4ea] p-2 rounded border border-[#ceead6] border-l-4 border-l-[#198038]">
                         <span class="text-[10px] text-[#198038] uppercase block mb-1 leading-none">Moisture</span>
-                        <span class="text-sm text-[#198038] font-bold block">${formatMoisture(raw['wood_moisture'])}</span>
+                        <span class="text-sm text-[#198038] font-bold block">${formatNum(moistureVal)}</span>
                     </div>
                 </div>`;
 
-                html += Row("Batch ID", raw['Batch Kiln ID'] || raw['Batch_Kiln_ID']);
-
-                // Robust Time Lookup
-                let dateStr = raw['production_start_date'] || raw['Date'] || '';
-                const timeKeys = ['production_time_date', 'production_start_time', 'Production Start Time', 'Time', 'time', 'Start Time'];
-                let foundTime = '';
-                for (let k of timeKeys) {
-                    if (raw[k]) { foundTime = raw[k]; break; }
+                const m1 = formatNum(getRaw(raw, 'moisture_reading_1', 'Moisture_reading_1', 'Wood_Moisture.1'));
+                const m2 = formatNum(getRaw(raw, 'moisture_reading_2', 'Moisture_Reading_2', 'Wood_Moisture.2'));
+                const m3 = formatNum(getRaw(raw, 'moisture_reading_3', 'Moisture_Reading_3', 'Wood_Moisture.3'));
+                const m4 = formatNum(getRaw(raw, 'moisture_reading_4', 'Moisture_Reading_4', 'Wood_Moisture.4'));
+                const m5 = formatNum(getRaw(raw, 'moisture_reading_5', 'Moisture_Reading_5', 'Wood_Moisture.5'));
+                if (m1 !== '--' || m2 !== '--' || m3 !== '--' || m4 !== '--' || m5 !== '--') {
+                    html += Row("Moisture readings (1–5)", [m1, m2, m3, m4, m5].join(' · '));
                 }
 
+                html += Row("Batch ID", getRaw(raw, 'Batch Kiln ID', 'Batch_Kiln_ID'));
+
+                const dateStr = getRaw(raw, 'production_start_date', 'Production_Start_Date', 'Date');
+                const timeVal = getRaw(raw, 'production_time_date', 'Production_Time_Date', 'production_start_time', 'Start Time');
+                const subDatetime = getRaw(raw, 'submission_datetime', 'Submission_Datetime');
                 let timeDisplay = dateStr;
-                if (foundTime) {
-                    if (timeDisplay) timeDisplay += ' ' + foundTime;
-                    else timeDisplay = foundTime;
-                }
+                if (timeVal) timeDisplay = timeDisplay ? (timeDisplay + ' ' + timeVal) : String(timeVal);
+                if (subDatetime) timeDisplay = timeDisplay ? (timeDisplay + ' (submitted: ' + subDatetime + ')') : String(subDatetime);
+                html += Row("Date / Time", timeDisplay);
 
-                html += Row("Date Time Stamp", timeDisplay);
-                html += Row("Partner", raw['Partner Name']);
+                html += Row("Partner", getRaw(raw, 'Partner Name', 'Partner_Name'));
+                html += Row("Facility", getRaw(raw, 'Facility Name', 'Facility_Name'));
+                const vol = getRaw(raw, 'calculated_volume', 'Calculated_Volume');
+                if (vol) html += Row("Calculated volume", formatNum(vol));
             } else {
-                // LOOKER Logic
+                const moistureVal = getRaw(raw, 'wood_moisture', 'Wood_Moisture');
+                const kilnId = getRaw(raw, 'Kiln ID', 'Kiln_ID');
+                const slot = getRaw(raw, 'Slot');
                 html += `
                 <div class="grid grid-cols-2 gap-2 mb-3">
                     <div class="bg-[#f8f9fa] p-2 rounded border border-[#e0e0e0] border-l-4 border-l-gray-400">
                         <span class="text-[10px] text-[#697077] uppercase block mb-1 leading-none">Kiln</span>
-                        <span class="text-sm text-[#161616] font-medium block truncate" title="${raw['Kiln ID'] || '--'} / ${raw['Slot'] || '--'}">${raw['Kiln ID'] || '--'} / ${raw['Slot'] || '--'}</span>
+                        <span class="text-sm text-[#161616] font-medium block truncate" title="${kilnId || '--'} / ${slot || '--'}">${kilnId || '--'} / ${slot || '--'}</span>
                     </div>
                     <div class="bg-[#e6f4ea] p-2 rounded border border-[#ceead6] border-l-4 border-l-[#198038]">
                         <span class="text-[10px] text-[#198038] uppercase block mb-1 leading-none">Moisture</span>
-                        <span class="text-sm text-[#198038] font-bold block">${formatMoisture(raw['wood_moisture'])}</span>
+                        <span class="text-sm text-[#198038] font-bold block">${formatNum(moistureVal)}</span>
                     </div>
                 </div>`;
 
-                html += Row("Inv ID", raw['Inventory ID']);
-                html += Row("Start", `${raw['Start Date']} ${raw['Start Time']}`);
-                html += Row("Partner", raw['Partner Name']);
+                html += Row("Inv ID", getRaw(raw, 'Inventory ID', 'Inventory_ID'));
+                html += Row("Start", `${getRaw(raw, 'Start Date')} ${getRaw(raw, 'Start Time')}`.trim() || '--');
+                html += Row("Partner", getRaw(raw, 'Partner Name', 'Partner_Name'));
             }
             container.innerHTML = html;
         }
@@ -868,8 +911,9 @@
         function updateTabData() {
             STAGES.forEach(t => {
                 const btn = document.getElementById('tab_' + t);
-                if (t === currentStage) btn.className = "px-4 py-1.5 text-xs font-semibold text-white bg-[#525252] shadow-inner transition";
-                else btn.className = "px-4 py-1.5 text-xs text-[#c6c6c6] hover:text-white hover:bg-[#393939] transition";
+                if (!btn) return;
+                if (t === currentStage) btn.className = "px-3 py-1.5 text-xs font-semibold text-white bg-[#525252] shadow-inner transition whitespace-nowrap";
+                else btn.className = "px-3 py-1.5 text-xs text-[#c6c6c6] hover:text-white hover:bg-[#525252] transition whitespace-nowrap";
             });
         }
 
@@ -912,7 +956,7 @@
         function updateRejectionVisibility() {
             const status = document.getElementById('statusSelect').value;
             const reasons = document.getElementById('rejectionSection');
-            if (status === 'Rejected') {
+            if (status === 'Rejected' || status === 'No') {
                 reasons.classList.remove('hidden');
                 if (window.updateRejectionReasons) window.updateRejectionReasons(TASK_TYPE, currentStage);
             } else {
