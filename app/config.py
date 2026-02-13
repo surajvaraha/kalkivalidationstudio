@@ -1,6 +1,6 @@
 
 # ─── Status / Reason Option Lists ──────────────────────────────────────────
-YES_NO_QUERY = ["Yes", "No", "Under Query"]
+# Unified status options for ALL stages (moisture + process)
 STATUS_OPTIONS = ["Approved", "Rejected", "Under Query", "Link error"]
 
 MOISTURE_REJECTION_REASONS = [
@@ -21,44 +21,27 @@ GENERAL_REJECTION_REASONS = [
 ]
 
 # ─── Standard Stage Keys ───────────────────────────────────────────────────
-# Kalki uses moisture_1..5 (5 separate meter images), Looker uses single 'moisture'
+# Kalki: 5 moisture readings + 4 process stages
 STAGES = [
-    'moisture', 'moisture_1', 'moisture_2', 'moisture_3', 'moisture_4', 'moisture_5',
+    'moisture_1', 'moisture_2', 'moisture_3', 'moisture_4', 'moisture_5',
     'start', 'mid', '90', 'end',
 ]
 
 def get_stages_for_task_type(task_type):
     """Return list of stages relevant to the task type."""
-    from app.models import TaskType
-    if task_type == TaskType.KALKI:
-        return ['moisture_1', 'moisture_2', 'moisture_3', 'moisture_4', 'moisture_5',
-                'start', 'mid', '90', 'end']
-    elif task_type == TaskType.LOOKER:
-        return ['moisture', 'start', 'mid', '90', 'end']
     return STAGES
 
 # ─── Validation Schema ─────────────────────────────────────────────────────
 # image_patterns: columns to search for the image URL (checked in order)
 # status_col / reason_col / comment_col: OUTPUT column names written by exporter
 VALIDATION_SCHEMA = [
-    # Looker single moisture
-    {
-        "key": "moisture",
-        "label": "Wood Moisture",
-        "image_patterns": ["Wood Moisture Image Link", "Wood Moisture (Image)", "moisture_image"],
-        "status_col": "Moisture Status",
-        "status_options": YES_NO_QUERY,
-        "reason_col": "Moisture Remark",
-        "reason_options": MOISTURE_REJECTION_REASONS,
-        "comment_col": "Moisture Comment",
-    },
     # Kalki 5 moisture readings
     {
         "key": "moisture_1",
         "label": "Moisture 1",
         "image_patterns": ["Wood Moisture Image 1"],
         "status_col": "Moisture 1 Status",
-        "status_options": YES_NO_QUERY,
+        "status_options": STATUS_OPTIONS,
         "reason_col": "Moisture 1 Remark",
         "reason_options": MOISTURE_REJECTION_REASONS,
         "comment_col": "Moisture 1 Comment",
@@ -68,7 +51,7 @@ VALIDATION_SCHEMA = [
         "label": "Moisture 2",
         "image_patterns": ["Wood Moisture Image 2"],
         "status_col": "Moisture 2 Status",
-        "status_options": YES_NO_QUERY,
+        "status_options": STATUS_OPTIONS,
         "reason_col": "Moisture 2 Remark",
         "reason_options": MOISTURE_REJECTION_REASONS,
         "comment_col": "Moisture 2 Comment",
@@ -78,7 +61,7 @@ VALIDATION_SCHEMA = [
         "label": "Moisture 3",
         "image_patterns": ["Wood Moisture Image 3"],
         "status_col": "Moisture 3 Status",
-        "status_options": YES_NO_QUERY,
+        "status_options": STATUS_OPTIONS,
         "reason_col": "Moisture 3 Remark",
         "reason_options": MOISTURE_REJECTION_REASONS,
         "comment_col": "Moisture 3 Comment",
@@ -88,7 +71,7 @@ VALIDATION_SCHEMA = [
         "label": "Moisture 4",
         "image_patterns": ["Wood Moisture Image 4"],
         "status_col": "Moisture 4 Status",
-        "status_options": YES_NO_QUERY,
+        "status_options": STATUS_OPTIONS,
         "reason_col": "Moisture 4 Remark",
         "reason_options": MOISTURE_REJECTION_REASONS,
         "comment_col": "Moisture 4 Comment",
@@ -98,7 +81,7 @@ VALIDATION_SCHEMA = [
         "label": "Moisture 5",
         "image_patterns": ["Wood Moisture Image 5"],
         "status_col": "Moisture 5 Status",
-        "status_options": YES_NO_QUERY,
+        "status_options": STATUS_OPTIONS,
         "reason_col": "Moisture 5 Remark",
         "reason_options": MOISTURE_REJECTION_REASONS,
         "comment_col": "Moisture 5 Comment",

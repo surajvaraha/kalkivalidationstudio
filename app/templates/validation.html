@@ -290,6 +290,10 @@
                 class="text-xs font-medium text-[#f4f4f4] bg-[#198038] hover:bg-[#0e6027] px-3 py-1.5 transition">
                 Export .xlsx
             </button>
+            <button onclick="startRejectionReport()"
+                class="text-xs font-medium text-[#f4f4f4] bg-[#da1e28] hover:bg-[#b81922] px-3 py-1.5 transition">
+                Rejection Report
+            </button>
         </div>
     </header>
 
@@ -302,21 +306,9 @@
                 <h3 class="text-[10px] font-semibold text-[#525252] uppercase tracking-wider">Batch Info</h3>
             </div>
 
-            <!-- V9.1: Status Table (Fixed at Top) -->
-            <div class="border-b border-[#e0e0e0] bg-white shrink-0">
-                <table class="status-table w-full">
-                    <thead>
-                        <tr>
-                            <th class="py-2 px-3 text-left text-[9px] text-[#8d8d8d] uppercase tracking-wider">Stage
-                            </th>
-                            <th class="py-2 px-3 text-left text-[9px] text-[#8d8d8d] uppercase tracking-wider">Status
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody id="leftPanelStatusTable">
-                        <!-- JS Populates -->
-                    </tbody>
-                </table>
+            <!-- Compact Stage/Status Grid: Moisture row + Process row -->
+            <div id="stageStatusGrid" class="border-b border-[#e0e0e0] bg-white shrink-0 p-2">
+                <!-- JS populates two rows: moisture pills, then process pills -->
             </div>
 
             <!-- Scrollable Details -->
@@ -498,6 +490,39 @@
         </div>
     </div>
 
+    <!-- Rejection Report Progress Modal -->
+    <div id="reportModal" class="hidden fixed inset-0 bg-[#161616]/70 flex items-center justify-center z-[100] backdrop-blur-sm">
+        <div class="bg-white w-full max-w-md shadow-2xl border-t-4 border-[#da1e28]">
+            <div class="p-5">
+                <h3 class="text-lg font-semibold text-[#161616] mb-1">Generating Rejection Report</h3>
+                <p id="reportMessage" class="text-sm text-[#525252] mb-4">Starting...</p>
+                <div class="w-full h-2 bg-[#e0e0e0] rounded-full overflow-hidden">
+                    <div id="reportProgress" class="h-full bg-[#da1e28] transition-all duration-500 ease-out" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between mt-2">
+                    <span id="reportPercent" class="text-xs text-[#8d8d8d] font-mono">0%</span>
+                    <span id="reportEta" class="text-xs text-[#8d8d8d] font-mono"></span>
+                </div>
+            </div>
+            <div id="reportActions" class="hidden border-t border-[#e0e0e0] flex">
+                <button onclick="closeReportModal()"
+                    class="w-1/2 h-12 bg-[#393939] text-white hover:bg-[#4c4c4c] text-sm font-medium transition text-left px-4">Close</button>
+                <button id="reportDownloadBtn" onclick="downloadReport()"
+                    class="w-1/2 h-12 bg-[#198038] text-white hover:bg-[#0e6027] text-sm font-medium transition text-left px-4 flex justify-between items-center">
+                    <span>Download ZIP</span>
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                </button>
+            </div>
+            <div id="reportProcessing" class="border-t border-[#e0e0e0] flex">
+                <button onclick="cancelReport()"
+                    class="w-full h-12 bg-[#da1e28] text-white hover:bg-[#b81922] text-sm font-medium transition px-4 flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    Stop Generation
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Logic -->
     <script>
         const TASK_ID = "{{ task.id }}";
@@ -513,7 +538,7 @@
         let saveTimeout;
 
         function getStageLabel(key) {
-            const L = { 'moisture': 'Moist', 'moisture_1': 'M1', 'moisture_2': 'M2', 'moisture_3': 'M3', 'moisture_4': 'M4', 'moisture_5': 'M5', 'start': 'Start', 'mid': 'Mid', '90': '90%', 'end': 'End' };
+            const L = { 'moisture_1': 'M1', 'moisture_2': 'M2', 'moisture_3': 'M3', 'moisture_4': 'M4', 'moisture_5': 'M5', 'start': 'Start', 'mid': 'Mid', '90': '90%', 'end': 'End' };
             return L[key] || key;
         }
 
@@ -581,10 +606,8 @@
                     if (e.key === 'ArrowLeft') prevStage();
                 }
 
-                // A = Accept (Yes for moisture, Approved for process)
-                // R = Reject (opens modal; No for moisture, Rejected for process)
-                // Q = Under Query (both)
-                if (key === 'a') { e.preventDefault(); setStatus(isMoistureStage(currentStage) ? 'Yes' : 'Approved'); return; }
+                // A = Approved, R = Rejected (opens modal), Q = Under Query
+                if (key === 'a') { e.preventDefault(); setStatus('Approved'); return; }
                 if (key === 'r') { e.preventDefault(); openRejectionModal(); return; }
                 if (key === 'q') { e.preventDefault(); setStatus('Under Query'); return; }
             });
@@ -621,9 +644,8 @@
             const select = document.getElementById('reasonSelect');
             const validOptions = Array.from(select.options).filter(o => o.value !== "");
             if (idx < validOptions.length) {
-                // Set status: moisture uses "No", process uses "Rejected"
-                const rejectedVal = isMoistureStage(currentStage) ? 'No' : 'Rejected';
-                document.getElementById('statusSelect').value = rejectedVal;
+                // Unified: always use "Rejected" for all stages
+                document.getElementById('statusSelect').value = 'Rejected';
                 // Then set reason
                 select.value = validOptions[idx].value;
                 // Refresh UI to show rejection fields, then save
@@ -648,7 +670,7 @@
         function validateNavigation() {
             const status = document.getElementById('statusSelect').value;
             const reason = document.getElementById('reasonSelect').value;
-            const isRejected = (status === 'Rejected') || (status === 'No'); // No = rejected for moisture
+            const isRejected = (status === 'Rejected');
 
             if (isRejected && !reason) {
                 const reasonSelect = document.getElementById('reasonSelect');
@@ -701,10 +723,8 @@
 
         function setStatusOptionsForStage(stage) {
             const sel = document.getElementById('statusSelect');
-            const isMoisture = !stage || stage === 'moisture' || (typeof stage === 'string' && stage.startsWith('moisture_'));
-            const options = isMoisture
-                ? [['', 'Select...'], ['Yes', 'Yes'], ['No', 'No'], ['Under Query', 'Under Query']]
-                : [['', 'Select...'], ['Approved', 'Approved'], ['Rejected', 'Rejected'], ['Link error', 'Link Error'], ['Under Query', 'Under Query']];
+            // Unified status options for ALL stages (moisture + process)
+            const options = [['', 'Select...'], ['Approved', 'Approved'], ['Rejected', 'Rejected'], ['Link error', 'Link Error'], ['Under Query', 'Under Query']];
             sel.innerHTML = options.map(([val, text]) => `<option value="${val}">${text}</option>`).join('');
         }
 
@@ -713,7 +733,6 @@
             const raw = batch.raw_data || {};
             // Importer normalizes image URLs to moisture_image, moisture_1_image, start_image, etc.
             const STAGE_CONFIG = {
-                'moisture': { col: 'Wood Moisture Image', alt_col: 'Wood Moisture (Image)', normalized: 'moisture_image' },
                 'moisture_1': { col: 'Wood Moisture Image 1', normalized: 'moisture_1_image' },
                 'moisture_2': { col: 'Wood Moisture Image 2', normalized: 'moisture_2_image' },
                 'moisture_3': { col: 'Wood Moisture Image 3', normalized: 'moisture_3_image' },
@@ -742,7 +761,7 @@
             const valData = batch.validation_data || {};
             const stageData = valData[currentStage] || {};
 
-            // Moisture stages use Yes/No/Under Query; process stages use Approved/Rejected/etc.
+            // All stages use unified: Approved/Rejected/Under Query/Link error
             setStatusOptionsForStage(currentStage);
             document.getElementById('statusSelect').value = stageData.status || "";
 
@@ -757,29 +776,50 @@
         }
 
         function updateLeftPanelTable(valData) {
-            const tbody = document.getElementById('leftPanelStatusTable');
-            tbody.innerHTML = '';
-            STAGES.forEach(s => {
-                const tr = document.createElement('tr');
-                const data = valData[s];
-                const status = data ? data.status : null;
+            const moistureStages = STAGES.filter(s => isMoistureStage(s));
+            const processStages = STAGES.filter(s => !isMoistureStage(s));
+            const container = document.getElementById('stageStatusGrid');
+            container.innerHTML = '';
 
+            function makePill(stageKey) {
+                const data = valData[stageKey];
+                const status = data ? data.status : null;
                 let badgeClass = 'status-pending';
                 let badgeText = 'Pending';
+                if (status === 'Approved') { badgeClass = 'status-approved'; badgeText = 'A'; }
+                else if (status === 'Rejected') { badgeClass = 'status-rejected'; badgeText = 'R'; }
+                else if (status) { badgeClass = 'bg-blue-100 text-blue-800 status-badge'; badgeText = status === 'Under Query' ? 'Q' : (status === 'Link error' ? 'L' : status.charAt(0)); }
+                const isCurrent = stageKey === currentStage;
+                const ring = isCurrent ? ' ring-2 ring-[#161616] ring-offset-1' : '';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.title = getStageLabel(stageKey) + ': ' + (data && data.status ? data.status : 'Pending');
+                btn.className = `px-2 py-0.5 text-[10px] font-semibold rounded status-badge cursor-pointer hover:opacity-90 transition ${badgeClass}${ring}`;
+                btn.textContent = getStageLabel(stageKey);
+                btn.onclick = () => changeStage(stageKey);
+                return btn;
+            }
 
-                if (status === 'Approved' || status === 'Yes') { badgeClass = 'status-approved'; badgeText = status === 'Yes' ? 'Yes' : 'Approved'; }
-                else if (status === 'Rejected' || status === 'No') { badgeClass = 'status-rejected'; badgeText = status === 'No' ? 'No' : 'Rejected'; }
-                else if (status) { badgeClass = 'bg-blue-100 text-blue-800 status-badge'; badgeText = status; }
-
-                // Highlight current row
-                if (s === currentStage) tr.className = "bg-[#f0f0f0] font-bold";
-
-                tr.innerHTML = `
-                    <td class="capitalize text-[10px]">${getStageLabel(s)}</td>
-                    <td><span class="${badgeClass} status-badge">${badgeText}</span></td>
-                `;
-                tbody.appendChild(tr);
-            });
+            if (moistureStages.length) {
+                const moistureRow = document.createElement('div');
+                moistureRow.className = 'flex items-center gap-1 mb-1.5';
+                const moistureLabel = document.createElement('span');
+                moistureLabel.className = 'text-[9px] text-[#8d8d8d] uppercase w-14 shrink-0';
+                moistureLabel.textContent = 'Moisture';
+                moistureRow.appendChild(moistureLabel);
+                moistureStages.forEach(s => moistureRow.appendChild(makePill(s)));
+                container.appendChild(moistureRow);
+            }
+            if (processStages.length) {
+                const processRow = document.createElement('div');
+                processRow.className = 'flex items-center gap-1 flex-wrap';
+                const processLabel = document.createElement('span');
+                processLabel.className = 'text-[9px] text-[#8d8d8d] uppercase w-14 shrink-0';
+                processLabel.textContent = 'Process';
+                processRow.appendChild(processLabel);
+                processStages.forEach(s => processRow.appendChild(makePill(s)));
+                container.appendChild(processRow);
+            }
         }
 
         // --- V8 Logic ---
@@ -849,68 +889,56 @@
                 return isNaN(num) ? String(val) : num.toFixed(2);
             };
 
-            if (TASK_TYPE === 'KALKI') {
-                // Real Kalki input uses: Kiln Name, Kiln ID, wood_moisture, moisture_reading_1..5,
-                // production_start_date, production_time_date, submission_datetime, Partner Name, Facility Name, etc.
-                const kilnName = getRaw(raw, 'Kiln Name', 'Kiln_Name');
-                const kilnId = getRaw(raw, 'Kiln ID', 'Kiln_ID');
-                const moistureVal = getRaw(raw, 'wood_moisture', 'Wood_Moisture', 'moisture_reading_1', 'Moisture_reading_1');
+            // Kalki input: Kiln Name, Kiln ID, wood_moisture, moisture_reading_1..5, etc.
+            const kilnName = getRaw(raw, 'Kiln Name', 'Kiln_Name');
+            const kilnId = getRaw(raw, 'Kiln ID', 'Kiln_ID');
+            // Context-aware moisture: show only the reading for current stage (M1->reading_1, etc.); process stages show wood_moisture
+            const moistureColMap = { moisture_1: 'moisture_reading_1', moisture_2: 'moisture_reading_2', moisture_3: 'moisture_reading_3', moisture_4: 'moisture_reading_4', moisture_5: 'moisture_reading_5' };
+            const moistureCol = isMoistureStage(currentStage) && moistureColMap[currentStage]
+                ? moistureColMap[currentStage] : 'wood_moisture';
+            const moistureVal = getRaw(raw, moistureCol, moistureCol.replace(/_/g, ' '), 'Wood_Moisture', 'Moisture_reading_1');
+            const moistureLabel = isMoistureStage(currentStage) && moistureColMap[currentStage]
+                ? (getStageLabel(currentStage) + ' Reading') : 'Wood Moisture';
 
-                html += `
-                <div class="grid grid-cols-2 gap-2 mb-3">
-                    <div class="bg-[#f8f9fa] p-2 rounded border border-[#e0e0e0] border-l-4 border-l-gray-400">
-                        <span class="text-[10px] text-[#697077] uppercase block mb-1 leading-none">Kiln</span>
-                        <span class="text-sm text-[#161616] font-medium block truncate" title="${kilnName || '--'} (${kilnId || '--'})">${kilnName || '--'} (${kilnId || '--'})</span>
-                    </div>
-                    <div class="bg-[#e6f4ea] p-2 rounded border border-[#ceead6] border-l-4 border-l-[#198038]">
-                        <span class="text-[10px] text-[#198038] uppercase block mb-1 leading-none">Moisture</span>
-                        <span class="text-sm text-[#198038] font-bold block">${formatNum(moistureVal)}</span>
-                    </div>
-                </div>`;
+            html += `
+            <div class="grid grid-cols-2 gap-2 mb-3">
+                <div class="bg-[#f8f9fa] p-2 rounded border border-[#e0e0e0] border-l-4 border-l-gray-400">
+                    <span class="text-[10px] text-[#697077] uppercase block mb-1 leading-none">Kiln</span>
+                    <span class="text-sm text-[#161616] font-medium block truncate" title="${kilnName || '--'} (${kilnId || '--'})">${kilnName || '--'} (${kilnId || '--'})</span>
+                </div>
+                <div class="bg-[#e6f4ea] p-2 rounded border border-[#ceead6] border-l-4 border-l-[#198038]">
+                    <span class="text-[10px] text-[#198038] uppercase block mb-1 leading-none">${moistureLabel}</span>
+                    <span class="text-sm text-[#198038] font-bold block">${formatNum(moistureVal)}</span>
+                </div>
+            </div>`;
 
-                const m1 = formatNum(getRaw(raw, 'moisture_reading_1', 'Moisture_reading_1', 'Wood_Moisture.1'));
-                const m2 = formatNum(getRaw(raw, 'moisture_reading_2', 'Moisture_Reading_2', 'Wood_Moisture.2'));
-                const m3 = formatNum(getRaw(raw, 'moisture_reading_3', 'Moisture_Reading_3', 'Wood_Moisture.3'));
-                const m4 = formatNum(getRaw(raw, 'moisture_reading_4', 'Moisture_Reading_4', 'Wood_Moisture.4'));
-                const m5 = formatNum(getRaw(raw, 'moisture_reading_5', 'Moisture_Reading_5', 'Wood_Moisture.5'));
-                if (m1 !== '--' || m2 !== '--' || m3 !== '--' || m4 !== '--' || m5 !== '--') {
-                    html += Row("Moisture readings (1–5)", [m1, m2, m3, m4, m5].join(' · '));
-                }
+            html += Row("Batch ID", getRaw(raw, 'Batch Kiln ID', 'Batch_Kiln_ID'));
 
-                html += Row("Batch ID", getRaw(raw, 'Batch Kiln ID', 'Batch_Kiln_ID'));
+            const createdDate = getRaw(raw, 'production_start_date', 'Production_Start_Date', 'Date');
+            const createdTime = getRaw(raw, 'production_time_date', 'Production_Time_Date', 'production_start_time', 'Start Time');
+            const subDatetime = getRaw(raw, 'submission_datetime', 'Submission_Datetime');
+            const submittedParts = (typeof subDatetime === 'string' && subDatetime) ? subDatetime.split(/[\sT]+/) : ['', ''];
+            const submittedDate = submittedParts[0] || '--';
+            const submittedTime = submittedParts[1] ? submittedParts[1].replace(/^(\d{2}:\d{2}).*/, '$1') : '--';
 
-                const dateStr = getRaw(raw, 'production_start_date', 'Production_Start_Date', 'Date');
-                const timeVal = getRaw(raw, 'production_time_date', 'Production_Time_Date', 'production_start_time', 'Start Time');
-                const subDatetime = getRaw(raw, 'submission_datetime', 'Submission_Datetime');
-                let timeDisplay = dateStr;
-                if (timeVal) timeDisplay = timeDisplay ? (timeDisplay + ' ' + timeVal) : String(timeVal);
-                if (subDatetime) timeDisplay = timeDisplay ? (timeDisplay + ' (submitted: ' + subDatetime + ')') : String(subDatetime);
-                html += Row("Date / Time", timeDisplay);
+            html += `
+            <div class="grid grid-cols-2 gap-2 mb-3">
+                <div class="bg-[#f8f9fa] p-2 rounded border border-[#e0e0e0]">
+                    <span class="text-[10px] text-[#697077] uppercase block mb-0.5">Created</span>
+                    <span class="text-xs text-[#161616] block">${createdDate || '--'}</span>
+                    <span class="text-[10px] text-[#525252]">${createdTime || '--'}</span>
+                </div>
+                <div class="bg-[#f8f9fa] p-2 rounded border border-[#e0e0e0]">
+                    <span class="text-[10px] text-[#697077] uppercase block mb-0.5">Submitted</span>
+                    <span class="text-xs text-[#161616] block">${submittedDate}</span>
+                    <span class="text-[10px] text-[#525252]">${submittedTime}</span>
+                </div>
+            </div>`;
 
-                html += Row("Partner", getRaw(raw, 'Partner Name', 'Partner_Name'));
-                html += Row("Facility", getRaw(raw, 'Facility Name', 'Facility_Name'));
-                const vol = getRaw(raw, 'calculated_volume', 'Calculated_Volume');
-                if (vol) html += Row("Calculated volume", formatNum(vol));
-            } else {
-                const moistureVal = getRaw(raw, 'wood_moisture', 'Wood_Moisture');
-                const kilnId = getRaw(raw, 'Kiln ID', 'Kiln_ID');
-                const slot = getRaw(raw, 'Slot');
-                html += `
-                <div class="grid grid-cols-2 gap-2 mb-3">
-                    <div class="bg-[#f8f9fa] p-2 rounded border border-[#e0e0e0] border-l-4 border-l-gray-400">
-                        <span class="text-[10px] text-[#697077] uppercase block mb-1 leading-none">Kiln</span>
-                        <span class="text-sm text-[#161616] font-medium block truncate" title="${kilnId || '--'} / ${slot || '--'}">${kilnId || '--'} / ${slot || '--'}</span>
-                    </div>
-                    <div class="bg-[#e6f4ea] p-2 rounded border border-[#ceead6] border-l-4 border-l-[#198038]">
-                        <span class="text-[10px] text-[#198038] uppercase block mb-1 leading-none">Moisture</span>
-                        <span class="text-sm text-[#198038] font-bold block">${formatNum(moistureVal)}</span>
-                    </div>
-                </div>`;
-
-                html += Row("Inv ID", getRaw(raw, 'Inventory ID', 'Inventory_ID'));
-                html += Row("Start", `${getRaw(raw, 'Start Date')} ${getRaw(raw, 'Start Time')}`.trim() || '--');
-                html += Row("Partner", getRaw(raw, 'Partner Name', 'Partner_Name'));
-            }
+            html += Row("Partner", getRaw(raw, 'Partner Name', 'Partner_Name'));
+            html += Row("Facility", getRaw(raw, 'Facility Name', 'Facility_Name'));
+            const vol = getRaw(raw, 'calculated_volume', 'Calculated_Volume');
+            if (vol) html += Row("Calculated volume", formatNum(vol));
             container.innerHTML = html;
         }
 
@@ -962,7 +990,7 @@
         function updateRejectionVisibility() {
             const status = document.getElementById('statusSelect').value;
             const reasons = document.getElementById('rejectionSection');
-            if (status === 'Rejected' || status === 'No') {
+            if (status === 'Rejected') {
                 reasons.classList.remove('hidden');
                 if (window.updateRejectionReasons) window.updateRejectionReasons(TASK_TYPE, currentStage);
             } else {
@@ -996,6 +1024,94 @@
         function doPan(e) { if (!isPanning) return; e.preventDefault(); panX = e.clientX - startX; panY = e.clientY - startY; applyTransform(); }
         function stopPan() { isPanning = false; document.body.style.cursor = ''; window.removeEventListener('mousemove', doPan); window.removeEventListener('mouseup', stopPan); }
         document.getElementById('imageContainer').addEventListener('wheel', (e) => { e.preventDefault(); const delta = -Math.sign(e.deltaY) * 0.1; zoom += delta; if (zoom < 0.05) zoom = 0.05; if (zoom > 10) zoom = 10; applyTransform(); }, { passive: false });
+
+        // --- Rejection Report ---
+        let _reportJobId = null;
+        let _reportPollTimer = null;
+
+        async function startRejectionReport() {
+            try {
+                document.getElementById('reportModal').classList.remove('hidden');
+                document.getElementById('reportActions').classList.add('hidden');
+                document.getElementById('reportProcessing').classList.remove('hidden');
+                document.getElementById('reportMessage').textContent = 'Starting report generation...';
+                document.getElementById('reportProgress').style.width = '0%';
+                document.getElementById('reportPercent').textContent = '0%';
+                document.getElementById('reportEta').textContent = '';
+
+                const res = await fetch(`/api/tasks/${TASK_ID}/rejection-report`, { method: 'POST' });
+                if (!res.ok) {
+                    const err = await res.json();
+                    document.getElementById('reportMessage').textContent = 'Error: ' + (err.detail || 'Failed to start');
+                    document.getElementById('reportActions').classList.remove('hidden');
+                    document.getElementById('reportProcessing').classList.add('hidden');
+                    document.getElementById('reportDownloadBtn').classList.add('hidden');
+                    return;
+                }
+                const data = await res.json();
+                _reportJobId = data.job_id;
+                pollReportStatus();
+            } catch (e) {
+                document.getElementById('reportMessage').textContent = 'Error: ' + e.message;
+            }
+        }
+
+        async function pollReportStatus() {
+            if (!_reportJobId) return;
+            try {
+                const res = await fetch(`/api/tasks/${TASK_ID}/rejection-report/status/${_reportJobId}`);
+                if (!res.ok) return;
+                const data = await res.json();
+
+                document.getElementById('reportMessage').textContent = data.message || 'Processing...';
+                const pct = data.percent || 0;
+                document.getElementById('reportProgress').style.width = pct + '%';
+                document.getElementById('reportPercent').textContent = pct + '%';
+
+                if (data.status === 'done') {
+                    document.getElementById('reportProcessing').classList.add('hidden');
+                    document.getElementById('reportActions').classList.remove('hidden');
+                    if (data.file) {
+                        document.getElementById('reportDownloadBtn').classList.remove('hidden');
+                    } else {
+                        document.getElementById('reportDownloadBtn').classList.add('hidden');
+                    }
+                    return;
+                }
+                if (data.status === 'error' || data.status === 'cancelled') {
+                    document.getElementById('reportProcessing').classList.add('hidden');
+                    document.getElementById('reportActions').classList.remove('hidden');
+                    document.getElementById('reportDownloadBtn').classList.add('hidden');
+                    return;
+                }
+
+                // Keep polling
+                _reportPollTimer = setTimeout(pollReportStatus, 1500);
+            } catch (e) {
+                _reportPollTimer = setTimeout(pollReportStatus, 3000);
+            }
+        }
+
+        async function cancelReport() {
+            if (!_reportJobId) return;
+            try {
+                await fetch(`/api/tasks/${TASK_ID}/rejection-report/cancel/${_reportJobId}`, { method: 'POST' });
+                document.getElementById('reportMessage').textContent = 'Stopping...';
+            } catch (e) { /* ignore */ }
+        }
+
+        function downloadReport() {
+            if (_reportJobId) {
+                window.location.href = `/api/tasks/${TASK_ID}/rejection-report/download/${_reportJobId}`;
+            }
+        }
+
+        function closeReportModal() {
+            document.getElementById('reportModal').classList.add('hidden');
+            if (_reportPollTimer) clearTimeout(_reportPollTimer);
+            _reportJobId = null;
+        }
+
         function initResizers() {
             const resizerLeft = document.getElementById('resizerLeft');
             const leftPanel = document.getElementById('panelLeft');

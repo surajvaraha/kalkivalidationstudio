@@ -8,7 +8,6 @@ Base = declarative_base()
 
 class TaskType(str, enum.Enum):
     KALKI = "KALKI"
-    LOOKER = "LOOKER"
     UNKNOWN = "UNKNOWN"
 
 class TaskStatus(str, enum.Enum):

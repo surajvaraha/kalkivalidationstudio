@@ -20,4 +20,8 @@ uploads/
 .vscode/
 .idea/
 .gemini/
+
+# Runtime artifacts
 exports/
+generated_reports/
+report_zips/

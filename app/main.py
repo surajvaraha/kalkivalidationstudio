@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Depends
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Depends, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import FileResponse
@@ -11,6 +11,7 @@ import uuid
 from app.database import init_db, get_db
 from app.models import ValidationTask, BatchRow
 from app.services import importer, exporter
+from app.services import report_generator
 from app.config import get_stages_for_task_type
 
 # Initialize Database
@@ -121,6 +122,57 @@ async def delete_task(task_id: str, db: Session = Depends(get_db)):
     db.commit()
     
     return {"status": "success", "id": task_id}
+
+# --- Rejection Report API ---
+
+@app.post("/api/tasks/{task_id}/rejection-report")
+async def start_rejection_report(task_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Kick off background PDF generation for all rejected batches in this task."""
+    task = db.query(ValidationTask).filter(ValidationTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    job_id = str(uuid.uuid4())
+    # Pass the DB session factory so the background thread creates its own session
+    background_tasks.add_task(report_generator.generate_rejection_report, task_id, job_id, get_db)
+    return {"job_id": job_id, "status": "started"}
+
+
+@app.get("/api/tasks/{task_id}/rejection-report/status/{job_id}")
+async def rejection_report_status(task_id: str, job_id: str):
+    """Poll the progress of a rejection report generation job."""
+    status = report_generator.get_job_status(job_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return status
+
+
+@app.post("/api/tasks/{task_id}/rejection-report/cancel/{job_id}")
+async def cancel_rejection_report(task_id: str, job_id: str):
+    """Cancel a running rejection report generation job."""
+    status = report_generator.get_job_status(job_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    report_generator.cancel_job(job_id)
+    return {"status": "cancelling", "message": "Cancel signal sent"}
+
+
+@app.get("/api/tasks/{task_id}/rejection-report/download/{job_id}")
+async def download_rejection_report(task_id: str, job_id: str):
+    """Download the generated ZIP once the job is done."""
+    status = report_generator.get_job_status(job_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if status.get("status") != "done":
+        raise HTTPException(status_code=400, detail="Report is not ready yet")
+
+    file_path = status.get("file")
+    if not file_path or not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Report file not found")
+
+    filename = status.get("filename", "RejectionReports.zip")
+    return FileResponse(file_path, media_type="application/zip", filename=filename)
+
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

@@ -56,13 +56,11 @@ def _make_json_safe(obj):
 # ─── Task Type Detection ───────────────────────────────────────────────────
 
 def determine_task_type(columns):
-    """Detect Kalki vs Looker from column names."""
+    """Detect task type from column names. Currently only Kalki is supported."""
     col_str = " ".join(str(c) for c in columns).lower()
     if "batch_kiln_id" in col_str or "batch kiln id" in col_str:
         return TaskType.KALKI
-    if "inventory id" in col_str or "artisan pro" in col_str:
-        return TaskType.LOOKER
-    return TaskType.UNKNOWN
+    return TaskType.KALKI  # Default to KALKI since Looker is deprecated
 
 
 # ─── Main Import ───────────────────────────────────────────────────────────
