@@ -9,7 +9,7 @@ import os
 import uuid
 
 from app.database import init_db, get_db
-from app.models import ValidationTask, BatchRow
+from app.models import ValidationTask, BatchRow, RejectionReasonMaster, StageReasonLink
 from app.services import importer, exporter
 from app.services import report_generator
 from app.config import get_stages_for_task_type
@@ -172,6 +172,120 @@ async def download_rejection_report(task_id: str, job_id: str):
 
     filename = status.get("filename", "RejectionReports.zip")
     return FileResponse(file_path, media_type="application/zip", filename=filename)
+
+
+# --- Rejection Reasons CRUD API ---
+
+_STAGES = ["moisture", "start", "mid", "90", "end"]
+
+
+@app.get("/api/rejection-reasons")
+async def get_rejection_reasons(view: str | None = None, db: Session = Depends(get_db)):
+    """Return rejection reasons. Default: grouped by stage for validation UI. ?view=master: full master list with stage assignments."""
+    if view == "master":
+        masters = db.query(RejectionReasonMaster).order_by(RejectionReasonMaster.id).all()
+        return [
+            {
+                "id": m.id,
+                "reason_text": m.reason_text,
+                "stages": [link.stage for link in sorted(m.stage_links, key=lambda l: (_STAGES.index(l.stage) if l.stage in _STAGES else 999, l.display_order))],
+            }
+            for m in masters
+        ]
+    # Default: grouped by stage (for validation UI), ordered by display_order then master id (added order)
+    links = (
+        db.query(StageReasonLink, RejectionReasonMaster)
+        .join(RejectionReasonMaster, StageReasonLink.master_id == RejectionReasonMaster.id)
+        .order_by(StageReasonLink.stage, StageReasonLink.display_order, RejectionReasonMaster.id)
+        .all()
+    )
+    grouped = {}
+    for link, master in links:
+        grouped.setdefault(link.stage, []).append({
+            "id": master.id,
+            "reason": master.reason_text,
+            "display_order": link.display_order,
+        })
+    return grouped
+
+
+@app.post("/api/rejection-reasons")
+async def add_rejection_reason(payload: dict, db: Session = Depends(get_db)):
+    """Create a new master reason, optionally assign to stages. stages: list of stage keys."""
+    reason_text = payload.get("reason_text", payload.get("reason", "")).strip()
+    if not reason_text:
+        raise HTTPException(status_code=400, detail="reason_text is required")
+
+    existing = db.query(RejectionReasonMaster).filter(RejectionReasonMaster.reason_text == reason_text).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Reason already exists")
+
+    stages = payload.get("stages") or []
+    master = RejectionReasonMaster(reason_text=reason_text)
+    db.add(master)
+    db.flush()
+    for idx, stage in enumerate(stages):
+        if stage in _STAGES:
+            db.add(StageReasonLink(master_id=master.id, stage=stage, display_order=idx))
+    db.commit()
+    db.refresh(master)
+    return {"id": master.id, "reason_text": master.reason_text, "stages": stages}
+
+
+@app.put("/api/rejection-reasons/{reason_id}")
+async def update_rejection_reason(reason_id: int, payload: dict, db: Session = Depends(get_db)):
+    """Update reason text. Changes propagate to all stages."""
+    master = db.query(RejectionReasonMaster).filter(RejectionReasonMaster.id == reason_id).first()
+    if not master:
+        raise HTTPException(status_code=404, detail="Reason not found")
+
+    new_text = payload.get("reason_text", payload.get("reason", "")).strip()
+    if not new_text:
+        raise HTTPException(status_code=400, detail="reason_text is required")
+
+    other = db.query(RejectionReasonMaster).filter(RejectionReasonMaster.reason_text == new_text, RejectionReasonMaster.id != reason_id).first()
+    if other:
+        raise HTTPException(status_code=400, detail="Another reason with this text already exists")
+
+    master.reason_text = new_text
+    db.commit()
+    return {"id": master.id, "reason_text": master.reason_text}
+
+
+@app.delete("/api/rejection-reasons/{reason_id}")
+async def delete_rejection_reason(reason_id: int, db: Session = Depends(get_db)):
+    """Delete a master reason and all stage links. Existing batch validation_data unchanged."""
+    master = db.query(RejectionReasonMaster).filter(RejectionReasonMaster.id == reason_id).first()
+    if not master:
+        raise HTTPException(status_code=404, detail="Reason not found")
+    db.delete(master)
+    db.commit()
+    return {"status": "success", "id": reason_id}
+
+
+@app.put("/api/rejection-reasons/{reason_id}/stages")
+async def toggle_stage_assignment(reason_id: int, payload: dict, db: Session = Depends(get_db)):
+    """Toggle stage assignment. payload: { stage: string, enabled: boolean }."""
+    stage = payload.get("stage", "").strip()
+    enabled = payload.get("enabled", True)
+    if stage not in _STAGES:
+        raise HTTPException(status_code=400, detail="Invalid stage")
+
+    master = db.query(RejectionReasonMaster).filter(RejectionReasonMaster.id == reason_id).first()
+    if not master:
+        raise HTTPException(status_code=404, detail="Reason not found")
+
+    link = db.query(StageReasonLink).filter(StageReasonLink.master_id == reason_id, StageReasonLink.stage == stage).first()
+    if enabled and not link:
+        max_order = db.query(StageReasonLink).filter(StageReasonLink.stage == stage).count()
+        db.add(StageReasonLink(master_id=reason_id, stage=stage, display_order=max_order))
+        db.commit()
+        return {"stage": stage, "enabled": True}
+    if not enabled and link:
+        db.delete(link)
+        db.commit()
+        return {"stage": stage, "enabled": False}
+    return {"stage": stage, "enabled": enabled}
 
 
 if __name__ == "__main__":

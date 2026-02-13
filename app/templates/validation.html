@@ -614,9 +614,9 @@
         });
 
         // --- Smart Rejection ---
-        function openRejectionModal() {
+        async function openRejectionModal() {
             // Force population of reasons to ensure shortcuts work even if dropdown wasn't visible
-            if (window.updateRejectionReasons) window.updateRejectionReasons(TASK_TYPE, currentStage);
+            if (window.updateRejectionReasons) await window.updateRejectionReasons(TASK_TYPE, currentStage);
 
             const select = document.getElementById('reasonSelect');
             const options = Array.from(select.options).filter(o => o.value !== "");

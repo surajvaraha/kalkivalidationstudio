@@ -1,0 +1,208 @@
+[
+  {
+    "reason_text": "Blurred Image",
+    "stages": [
+      "moisture",
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Date & Time Mismatch",
+    "stages": [
+      "moisture",
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Irrelevant Image",
+    "stages": [
+      "moisture",
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Incorrect Stage",
+    "stages": [
+      "moisture",
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Geo-Tag Missing",
+    "stages": [
+      "moisture",
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Wood Not Visible",
+    "stages": [
+      "moisture"
+    ]
+  },
+  {
+    "reason_text": "Moisture Meter Frozen (HOLD)",
+    "stages": [
+      "moisture"
+    ]
+  },
+  {
+    "reason_text": "Value Mismatch",
+    "stages": [
+      "moisture"
+    ]
+  },
+  {
+    "reason_text": "Duplicate Image",
+    "stages": [
+      "moisture",
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Visual Obstruction",
+    "stages": [
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Excess Heat",
+    "stages": [
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Smoke Visible",
+    "stages": [
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Kontiki Number Not Visible",
+    "stages": [
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Kontiki Number Mismatch",
+    "stages": [
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Multiple Kontiki Detected",
+    "stages": [
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Cropped Image",
+    "stages": [
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Green Wood Detected",
+    "stages": [
+      "start"
+    ]
+  },
+  {
+    "reason_text": "Biomass Overfilled",
+    "stages": [
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Improper Biomass Stacking",
+    "stages": [
+      "start"
+    ]
+  },
+  {
+    "reason_text": "High Ash Content",
+    "stages": [
+      "mid",
+      "90"
+    ]
+  },
+  {
+    "reason_text": "Insufficient Biomass",
+    "stages": [
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Unburnt Biomass",
+    "stages": [
+      "mid",
+      "90",
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Water Detected Inside Kontiki",
+    "stages": [
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Sand Detected Inside Kontiki",
+    "stages": [
+      "end"
+    ]
+  },
+  {
+    "reason_text": "Kontiki Damaged",
+    "stages": [
+      "start",
+      "mid",
+      "90",
+      "end"
+    ]
+  }
+]

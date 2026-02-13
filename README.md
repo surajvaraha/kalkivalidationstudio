@@ -57,7 +57,22 @@ Biochar Validation Studio is a specialized desktop-style web application designe
    Models are automatically created on startup via `Base.metadata.create_all(engine)`.
 
 ## Validation Schema (`app/config.py`)
-Central configuration for all validation logic. To add a new stage or modify rejection reasons, update the `VALIDATION_SCHEMA` and `GENERAL_REJECTION_REASONS` lists in this file.
+Central configuration for all validation logic. To add a new stage, update the `VALIDATION_SCHEMA` in this file.
+
+## Rejection Reasons (Shared via Git)
+
+Rejection reasons are stored in the database and seeded from `app/data/rejection_reasons_seed.json` on first run. When someone clones the repo and installs locally, these values are loaded automatically.
+
+**To share your custom rejection reasons** (after adding/editing in the dashboard):
+
+1. Export current reasons to the seed file:
+   ```bash
+   python -m app.scripts.export_rejection_reasons
+   ```
+2. Commit the updated `app/data/rejection_reasons_seed.json` to git.
+3. Others who clone and run the app will get these values on their first `init_db()`.
+
+Reasons are sorted by **added order** (oldest first, newest last) in the UI.
 
 ## Troubleshooting
 

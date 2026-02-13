@@ -22,6 +22,29 @@ class ValidationStatus(str, enum.Enum):
     SKIPPED = "SKIPPED" # For rows that might be empty or invalid
     IN_PROGRESS = "IN_PROGRESS"
 
+class RejectionReasonMaster(Base):
+    """Unique rejection reason text - defined once, used across stages."""
+    __tablename__ = "rejection_reason_master"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    reason_text = Column(String, nullable=False, unique=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    stage_links = relationship("StageReasonLink", back_populates="master", cascade="all, delete-orphan")
+
+
+class StageReasonLink(Base):
+    """Maps a master reason to a stage (many-to-many)."""
+    __tablename__ = "stage_reason_link"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    master_id = Column(Integer, ForeignKey("rejection_reason_master.id"), nullable=False)
+    stage = Column(String, nullable=False, index=True)  # moisture, start, mid, 90, end
+    display_order = Column(Integer, default=0)
+
+    master = relationship("RejectionReasonMaster", back_populates="stage_links")
+
+
 class ValidationTask(Base):
     __tablename__ = "validation_tasks"
 
