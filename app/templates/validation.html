@@ -710,7 +710,7 @@
             document.getElementById('validatedCount').innerText = count;
         }
 
-        function renderBatch() {
+        async function renderBatch() {
             if (!batches.length) return;
             const batch = batches[currentIndex];
             if (!batch) return;
@@ -718,7 +718,7 @@
             document.getElementById('progressBar').style.width = `${((currentIndex + 1) / batches.length) * 100}%`;
 
             renderBatchInfo(batch);
-            loadStageData(batch);
+            await loadStageData(batch);
         }
 
         function setStatusOptionsForStage(stage) {
@@ -729,7 +729,7 @@
         }
 
         // --- View Logic ---
-        function loadStageData(batch) {
+        async function loadStageData(batch) {
             const raw = batch.raw_data || {};
             // Importer normalizes image URLs to moisture_image, moisture_1_image, start_image, etc.
             const STAGE_CONFIG = {
@@ -765,8 +765,17 @@
             setStatusOptionsForStage(currentStage);
             document.getElementById('statusSelect').value = stageData.status || "";
 
-            // Critical: Call visibility & populate reasons BEFORE setting specific reason value
-            updateRejectionVisibility();
+            // Show/hide rejection section; await reason population so options exist before setting value
+            const isRejected = stageData.status === 'Rejected';
+            const rejectionSection = document.getElementById('rejectionSection');
+            if (isRejected) {
+                rejectionSection.classList.remove('hidden');
+                if (window.updateRejectionReasons) {
+                    await window.updateRejectionReasons(TASK_TYPE, currentStage);
+                }
+            } else {
+                rejectionSection.classList.add('hidden');
+            }
 
             document.getElementById('reasonSelect').value = stageData.reason || "";
             document.getElementById('commentBox').value = stageData.comment || "";
@@ -976,7 +985,8 @@
             batch.validation_data[currentStage] = payload.validation_data[currentStage];
 
             // Optimistic UI Update for Left Panel & Progress
-            loadStageData(batch);
+            updateLeftPanelTable(batch.validation_data || {});
+            updateTabData();
             updateProgress();
 
             try {
